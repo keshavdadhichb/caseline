@@ -40,7 +40,7 @@
           "rapid_in_out_ratio"
         ]
       },
-      "reason": "Compute per-account rolling features needed by the rules engine, anomaly model, and risk scorer."
+      "reason": "Compute per-account rolling features for customer 4521 \u2014 required as input for rules_engine, anomaly_model, and risk_scorer."
     },
     {
       "tool": "rules_engine",
@@ -55,7 +55,7 @@
           "high_risk_amount"
         ]
       },
-      "reason": "Check all named typology rules against customer 4521's features to identify any rule hits."
+      "reason": "Run all named typology rules against customer 4521 to surface any known AML red flags across the full typology set."
     },
     {
       "tool": "anomaly_model",
@@ -64,20 +64,16 @@
           "4521"
         ]
       },
-      "reason": "Score customer 4521 against the full population baseline to catch anything rules alone might miss, given the broad 'is this customer suspicious?' question."
+      "reason": "Broad 'what's going on' query \u2014 anomaly model catches anything unusual that rule-based checks might miss by comparing customer 4521 against the full population baseline."
     },
     {
       "tool": "graph_analysis",
       "params": {
         "accounts": [
           "4521"
-        ],
-        "checks": [
-          "fan_in_ring",
-          "short_cycle"
         ]
       },
-      "reason": "Investigate counterparty network for customer 4521 to detect ring or rapid-movement patterns that a single-entity rule check would not surface."
+      "reason": "Investigate customer 4521's counterparties and network for ring or fan-in patterns, since the open-ended question may include network-level concerns."
     },
     {
       "tool": "risk_scorer",
@@ -86,13 +82,13 @@
           "4521"
         ]
       },
-      "reason": "Combine rule hits, anomaly score, and graph findings into a final LOW/MEDIUM/HIGH risk rating for customer 4521."
+      "reason": "Combine rule hits, anomaly score, and graph findings into a final weighted risk level for customer 4521."
     }
   ],
   "skipped": [
     {
       "tool": "profile_data",
-      "reason": "This is a targeted single-entity query, not a broad overview \u2014 profile_data adds no value here."
+      "reason": "profile_data is for broad dataset overviews. This query is narrowly scoped to a single entity (customer 4521), so EDA-style profiling adds no value."
     }
   ],
   "clarification_needed": null

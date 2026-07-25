@@ -21,26 +21,16 @@
           "4521"
         ]
       },
-      "reason": "Scope all data to customer 4521 before any analysis."
+      "reason": "Scope the dataset to only account 4521's transactions before any analysis."
     },
     {
       "tool": "feature_engine",
       "params": {
         "accounts": [
           "4521"
-        ],
-        "features": [
-          "7d_txn_count",
-          "30d_txn_count",
-          "7d_sum",
-          "30d_sum",
-          "amount_zscore",
-          "velocity",
-          "pct_near_10k",
-          "rapid_in_out_ratio"
         ]
       },
-      "reason": "Compute per-account rolling features needed by the rules engine, anomaly model, and risk scorer."
+      "reason": "Compute rolling features (velocity, z-scores, rapid in/out ratio, % near $10k threshold) for account 4521 \u2014 required inputs for both rules_engine and risk_scorer."
     },
     {
       "tool": "rules_engine",
@@ -55,7 +45,7 @@
           "high_risk_amount"
         ]
       },
-      "reason": "Check all named typology rules against customer 4521's features to identify any rule hits."
+      "reason": "Run all named typology rules against account 4521's features to identify any rule-based flags relevant to a full risk assessment."
     },
     {
       "tool": "anomaly_model",
@@ -64,20 +54,16 @@
           "4521"
         ]
       },
-      "reason": "Score customer 4521 against the full population baseline to catch anything rules alone might miss, given the broad 'is this customer suspicious?' question."
+      "reason": "Score account 4521 against the full population baseline to catch anomalies that rule-based checks might miss \u2014 appropriate for a broad risk assessment request."
     },
     {
       "tool": "graph_analysis",
       "params": {
         "accounts": [
           "4521"
-        ],
-        "checks": [
-          "fan_in_ring",
-          "short_cycle"
         ]
       },
-      "reason": "Investigate counterparty network for customer 4521 to detect ring or rapid-movement patterns that a single-entity rule check would not surface."
+      "reason": "Examine account 4521's counterparty network for ring or fan-in patterns, since a comprehensive risk assessment should include network-level exposure."
     },
     {
       "tool": "risk_scorer",
@@ -86,13 +72,13 @@
           "4521"
         ]
       },
-      "reason": "Combine rule hits, anomaly score, and graph findings into a final LOW/MEDIUM/HIGH risk rating for customer 4521."
+      "reason": "Combine rule hits, anomaly score, and graph findings into a final weighted LOW/MEDIUM/HIGH risk rating for account 4521."
     }
   ],
   "skipped": [
     {
       "tool": "profile_data",
-      "reason": "This is a targeted single-entity query, not a broad overview \u2014 profile_data adds no value here."
+      "reason": "profile_data is for broad/overview queries across many accounts. This query targets a single specific entity, so a population-level EDA summary adds no value."
     }
   ],
   "clarification_needed": null

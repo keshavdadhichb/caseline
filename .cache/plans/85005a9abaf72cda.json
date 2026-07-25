@@ -1,0 +1,66 @@
+{
+  "intent": "detect_structuring",
+  "filters": {
+    "window_days": 30,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [
+    "structuring"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "window_days": 30
+      },
+      "reason": "Scope the dataset to the last 30 days of transactions before running any detection logic."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "features": [
+          "7d_txn_count",
+          "30d_txn_count",
+          "30d_txn_sum",
+          "pct_near_10k_threshold",
+          "amount_zscore"
+        ]
+      },
+      "reason": "Compute per-account rolling features \u2014 especially the % of transactions near the $10,000 threshold and velocity metrics \u2014 which are required inputs for the rules engine to detect structuring."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "structuring"
+        ]
+      },
+      "reason": "Apply the structuring rule, which flags accounts with multiple transactions just below the $10,000 reporting threshold within the time window."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "inputs": [
+          "rules_engine"
+        ]
+      },
+      "reason": "Assign LOW/MEDIUM/HIGH risk levels to accounts flagged by the structuring rule so analysts can prioritize review."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted structuring detection query, not a broad overview \u2014 population-level EDA adds no value here."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "The query is narrowly scoped to a specific typology (structuring); the rules engine is sufficient and the anomaly model would add nothing to this pure threshold-pattern question."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "Structuring is a single-account behavior pattern. No network, ring, or counterparty analysis is needed unless a specific entity relationship is being investigated."
+    }
+  ],
+  "clarification_needed": null
+}

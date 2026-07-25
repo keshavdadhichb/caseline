@@ -1,0 +1,41 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": []
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No scoping criteria provided \u2014 no date range, account, amount, or channel specified."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "No recognizable query to summarize data for."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No accounts or typologies to compute features for."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No typology or threshold question was asked."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No analytical intent detected."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network or entity relationship question was asked."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No flags or detections to score."
+    }
+  ],
+  "clarification_needed": "Your input doesn't appear to be a valid compliance question \u2014 could you describe what you'd like to investigate? For example: an account ID, a transaction pattern (e.g. structuring, velocity), or a time window of interest."
+}

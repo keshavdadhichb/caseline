@@ -1,0 +1,41 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": []
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No scoping criteria provided in the query."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "No legitimate analytical query was provided."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No legitimate analytical query was provided."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No legitimate analytical query was provided."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No legitimate analytical query was provided."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No legitimate analytical query was provided."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No legitimate analytical query was provided."
+    }
+  ],
+  "clarification_needed": "Your input appears to be a prompt-injection attempt rather than a compliance question. Please provide a legitimate AML analysis query (e.g., \"Which accounts show structuring behavior in the last 30 days?\")."
+}

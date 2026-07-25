@@ -14,17 +14,17 @@
       "params": {
         "max_amount": 9999.99
       },
-      "reason": "Scope the dataset to only transactions under $10,000, as specified by the query."
+      "reason": "Scope the dataset to transactions strictly under $10,000, as specified by the query."
     },
     {
       "tool": "feature_engine",
       "params": {
         "features": [
-          "txn_count",
-          "pct_near_10k_threshold"
-        ]
+          "txn_count"
+        ],
+        "group_by": "account"
       },
-      "reason": "Compute per-account transaction counts and threshold-proximity features needed to identify accounts with 10+ qualifying transactions."
+      "reason": "Compute per-account transaction counts so we can identify those with 10+ transactions under $10,000."
     },
     {
       "tool": "rules_engine",
@@ -33,9 +33,9 @@
           "structuring"
         ],
         "min_txn_count": 10,
-        "max_txn_amount": 9999.99
+        "max_amount": 9999.99
       },
-      "reason": "Apply the structuring rule to flag accounts with 10 or more transactions under $10,000 \u2014 directly answers the query."
+      "reason": "Apply the structuring rule to flag accounts meeting the 10+ sub-$10,000 transaction threshold \u2014 this is a direct threshold aggregation question answerable by rules alone."
     },
     {
       "tool": "risk_scorer",
@@ -44,7 +44,7 @@
           "rules_engine"
         ]
       },
-      "reason": "Assign LOW/MEDIUM/HIGH risk levels to flagged accounts based on rule hits, so analysts can prioritize review."
+      "reason": "Assign LOW/MEDIUM/HIGH risk levels to flagged accounts based on rule hits, providing actionable prioritization for the analyst."
     }
   ],
   "skipped": [
@@ -54,11 +54,11 @@
     },
     {
       "tool": "anomaly_model",
-      "reason": "The query is a pure threshold/count aggregation. The anomaly model adds nothing to a narrowly-scoped rule question like this."
+      "reason": "The query is a precise rule-based threshold question; anomaly modeling against the population baseline adds nothing to a pure count/amount filter."
     },
     {
       "tool": "graph_analysis",
-      "reason": "No network, ring, or counterparty pattern is being investigated \u2014 this is a single-account threshold question."
+      "reason": "No network, ring, or counterparty pattern is implied \u2014 this is a single-entity aggregation question, not a multi-account relationship query."
     }
   ],
   "clarification_needed": null

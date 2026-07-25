@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import re
 
+import pytest
+
 from tools.anomaly_model import anomaly_model
 from tools.case_builder import build_indexes, case_builder
 from tools.feature_engine import feature_engine
@@ -21,6 +23,8 @@ from tools.risk_scorer import risk_scorer
 from tools.rules_engine import rules_engine
 from tools.sar_drafter import draft_sar
 from tests.fixtures import build_fixture
+
+pytestmark = pytest.mark.live
 
 # Generic regulatory/procedural figures a compliance narrative may legitimately
 # cite without them appearing verbatim in this specific case's evidence.

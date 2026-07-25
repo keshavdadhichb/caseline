@@ -5,8 +5,42 @@
     "min_amount": null,
     "accounts": []
   },
-  "typologies": [],
+  "typologies": [
+    "structuring",
+    "velocity",
+    "rapid_movement",
+    "high_risk_amount"
+  ],
   "steps": [],
-  "skipped": [],
-  "clarification_needed": "What should I focus on \u2014 a specific account, time window, amount threshold, or typology (e.g. structuring, velocity, rapid movement, high-risk amounts)?"
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No account, date range, or amount scope specified \u2014 nothing to filter on."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "Cannot run without clarification on scope."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "Cannot run without clarification on scope."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "Cannot run without clarification on scope."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "Cannot run without clarification on scope."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "Cannot run without clarification on scope."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "Cannot run without clarification on scope."
+    }
+  ],
+  "clarification_needed": "Could you clarify the scope of your investigation \u2014 for example, a specific account or set of accounts, a time window, a minimum transaction amount, or a typology of interest (e.g. structuring, velocity, rapid movement)?"
 }

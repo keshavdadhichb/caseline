@@ -1,0 +1,84 @@
+{
+  "intent": "entity_lookup",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": [
+      "4521"
+    ]
+  },
+  "typologies": [],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "accounts": [
+          "4521"
+        ]
+      },
+      "reason": "Scope all data to account 4521 before any analysis."
+    },
+    {
+      "tool": "profile_data",
+      "params": {
+        "accounts": [
+          "4521"
+        ]
+      },
+      "reason": "The query is a broad 'tell me about' request for a single entity \u2014 a profile/EDA summary (txn count, volume, date range, channel breakdown) is exactly what's needed here."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "accounts": [
+          "4521"
+        ]
+      },
+      "reason": "Compute rolling features (velocity, z-score, rapid in->out ratio, % near $10k threshold) for account 4521 to support downstream detection tools."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "accounts": [
+          "4521"
+        ],
+        "typologies": [
+          "structuring",
+          "velocity",
+          "rapid_movement",
+          "high_risk_amount"
+        ]
+      },
+      "reason": "Run all named typology rules against account 4521 to surface any rule-based flags as part of a full account overview."
+    },
+    {
+      "tool": "anomaly_model",
+      "params": {
+        "accounts": [
+          "4521"
+        ]
+      },
+      "reason": "Score account 4521 against the full population baseline to detect anomalies that rules alone might miss, appropriate for a broad entity overview."
+    },
+    {
+      "tool": "graph_analysis",
+      "params": {
+        "accounts": [
+          "4521"
+        ]
+      },
+      "reason": "Investigate account 4521's counterparties and network position \u2014 relevant for a full entity profile to surface any ring or fan-in patterns."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "accounts": [
+          "4521"
+        ]
+      },
+      "reason": "Combine rule hits, anomaly score, and graph findings into a final weighted risk level for account 4521."
+    }
+  ],
+  "skipped": [],
+  "clarification_needed": null
+}

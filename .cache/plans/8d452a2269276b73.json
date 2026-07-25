@@ -1,0 +1,90 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": 30,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [
+    "structuring",
+    "velocity",
+    "rapid_movement",
+    "high_risk_amount"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "window_days": 30
+      },
+      "reason": "Scope the dataset to the last 30 days before running any detection."
+    },
+    {
+      "tool": "profile_data",
+      "params": {
+        "window_days": 30
+      },
+      "reason": "The query is broad ('is there suspicious activity?') with no specific entity or typology \u2014 a population-wide EDA summary is appropriate to understand the landscape before detection."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "window_days": 30,
+        "features": [
+          "txn_count_7d",
+          "txn_count_30d",
+          "txn_sum_7d",
+          "txn_sum_30d",
+          "amount_zscore",
+          "velocity",
+          "pct_near_10k",
+          "rapid_in_out_ratio"
+        ]
+      },
+      "reason": "Compute per-account rolling features required by the rules engine, anomaly model, and risk scorer."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "structuring",
+          "velocity",
+          "rapid_movement",
+          "high_risk_amount"
+        ]
+      },
+      "reason": "Run all named typology rules across the 30-day window to surface any rule-based flags."
+    },
+    {
+      "tool": "anomaly_model",
+      "params": {
+        "window_days": 30
+      },
+      "reason": "The query is open-ended ('suspicious activity' with no specific typology), so an IsolationForest sweep is warranted to catch anomalies that rules alone might miss."
+    },
+    {
+      "tool": "graph_analysis",
+      "params": {
+        "window_days": 30,
+        "patterns": [
+          "fan_in_ring",
+          "short_cycle"
+        ]
+      },
+      "reason": "Broad suspicion queries should also check for network-level patterns (rings, fan-in flows) that neither rules nor anomaly models directly cover."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "inputs": [
+          "rules_engine",
+          "anomaly_model",
+          "graph_analysis"
+        ]
+      },
+      "reason": "Combine all detection signals (rule hits, anomaly scores, graph findings) into weighted LOW/MEDIUM/HIGH risk levels per account."
+    }
+  ],
+  "skipped": [],
+  "clarification_needed": null
+}

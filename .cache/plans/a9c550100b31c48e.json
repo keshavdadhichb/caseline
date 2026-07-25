@@ -1,0 +1,65 @@
+{
+  "intent": "detect_structuring",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": []
+  },
+  "typologies": [
+    "structuring"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "max_amount": 9999.99
+      },
+      "reason": "Scope the dataset to only transactions under $10,000, which is the core criterion of the query."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "features": [
+          "txn_count",
+          "pct_near_10k_threshold"
+        ]
+      },
+      "reason": "Compute per-account transaction counts and threshold-proximity features needed for the rules engine to evaluate the 10+ sub-$10,000 transaction condition."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "structuring"
+        ],
+        "min_txn_count": 10,
+        "max_txn_amount": 9999.99
+      },
+      "reason": "Apply the structuring rule to flag accounts with 10 or more sub-$10,000 transactions \u2014 directly answerable by this rule alone."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "inputs": [
+          "rules_engine"
+        ]
+      },
+      "reason": "Produce a weighted LOW/MEDIUM/HIGH risk rating for each flagged account based on rule hits, since detection tools have produced actionable flags."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted threshold query, not a broad overview \u2014 EDA summary adds no value here."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "The query is a pure threshold/aggregation question with a specific rule criterion; anomaly detection would add nothing beyond what the rules engine already captures."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network, ring, or counterparty pattern is being investigated \u2014 this is a single-account aggregation query."
+    }
+  ],
+  "clarification_needed": null
+}

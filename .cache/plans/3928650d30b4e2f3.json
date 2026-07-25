@@ -1,0 +1,68 @@
+{
+  "intent": "detect_structuring",
+  "filters": {
+    "window_days": 30,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [
+    "structuring"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "window_days": 30
+      },
+      "reason": "Scope the dataset to the most recent 30 days of transactions relative to the dataset's latest timestamp before any detection work."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "features": [
+          "7d_txn_count",
+          "30d_txn_count",
+          "7d_sum",
+          "30d_sum",
+          "pct_near_10k_threshold",
+          "amount_zscore"
+        ]
+      },
+      "reason": "Structuring detection requires per-account rolling counts, sums, and the percentage of transactions near the $10,000 CTR threshold \u2014 all computed here."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "structuring"
+        ]
+      },
+      "reason": "Apply the named structuring rule (multiple sub-threshold transactions designed to avoid the $10,000 reporting requirement) to the engineered features."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "weights": {
+          "rule_hits": 0.7,
+          "anomaly_score": 0.3
+        }
+      },
+      "reason": "Translate structuring rule hits into a weighted LOW/MEDIUM/HIGH risk level so analysts can prioritize accounts for review."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted typology query (structuring), not a broad overview \u2014 population-level EDA adds no value here."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "The query is narrowly scoped to a specific, well-defined typology (structuring). The rules_engine is sufficient; the anomaly model would add noise without improving precision for this threshold-driven pattern."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "Structuring is a single-account behavioral pattern. No network, ring, or counterparty analysis is needed unless a specific entity relationship is flagged later."
+    }
+  ],
+  "clarification_needed": null
+}

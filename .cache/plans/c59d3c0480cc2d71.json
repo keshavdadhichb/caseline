@@ -1,0 +1,41 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": []
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No query was provided \u2014 there is no date, account, amount, or channel scope to apply."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "No query was provided \u2014 there is nothing to summarize or profile."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No query was provided \u2014 no features can be computed without a target scope."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No query was provided \u2014 no typology rules can be evaluated."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No query was provided \u2014 anomaly detection requires a defined population or scope."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No query was provided \u2014 no network or entity relationships to analyze."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No query was provided \u2014 no flags or findings exist to score."
+    }
+  ],
+  "clarification_needed": "Your message appears to contain only repeated characters and no recognizable query. Could you please describe what you'd like to investigate (e.g., a specific account, typology, time window, or amount threshold)?"
+}

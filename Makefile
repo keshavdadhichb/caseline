@@ -1,6 +1,6 @@
 PY := .venv/bin/python
 
-.PHONY: setup data backend frontend test eval
+.PHONY: setup data backend frontend test test-live eval
 
 setup:
 	python3 -m venv .venv
@@ -20,6 +20,9 @@ frontend:
 
 test:
 	$(PY) -m pytest backend/tests -q
+
+test-live:
+	$(PY) -m pytest backend/tests -q -m live
 
 eval:
 	$(PY) evals/run.py

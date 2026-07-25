@@ -1,0 +1,79 @@
+{
+  "intent": "detect_structuring",
+  "filters": {
+    "window_days": 45,
+    "min_amount": null,
+    "accounts": [
+      "cache fallback test"
+    ]
+  },
+  "typologies": [
+    "structuring"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "accounts": [
+          "cache fallback test"
+        ],
+        "window_days": 45
+      },
+      "reason": "Scope the dataset to the specified account ('cache fallback test') and the last 45 days relative to the dataset's latest timestamp before any analysis."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "accounts": [
+          "cache fallback test"
+        ],
+        "features": [
+          "7d_txn_count",
+          "30d_txn_count",
+          "7d_txn_sum",
+          "30d_txn_sum",
+          "amount_zscore",
+          "velocity",
+          "pct_near_10k_threshold"
+        ]
+      },
+      "reason": "Compute per-account rolling features \u2014 especially % of transactions near the $10,000 threshold and velocity \u2014 which are required inputs for the structuring rule in rules_engine."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "structuring"
+        ],
+        "accounts": [
+          "cache fallback test"
+        ]
+      },
+      "reason": "Apply the structuring typology rule to detect repeated sub-$10,000 transactions designed to evade CTR reporting thresholds."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "accounts": [
+          "cache fallback test"
+        ]
+      },
+      "reason": "Combine rule hits from the structuring detection into a weighted LOW/MEDIUM/HIGH risk rating for the account."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted single-account query, not a broad overview \u2014 EDA summary adds no value here."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "The query is narrowly scoped to a specific typology (structuring) for a named account; anomaly_model is only warranted for broad 'find anything suspicious' queries and would add nothing to this pure rule-based detection."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network, ring, or counterparty pattern is implied \u2014 the query asks about structuring behavior on a single account, not multi-entity relationships."
+    }
+  ],
+  "clarification_needed": null
+}

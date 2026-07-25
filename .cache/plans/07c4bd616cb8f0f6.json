@@ -1,0 +1,65 @@
+{
+  "intent": "aggregate_threshold",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": []
+  },
+  "typologies": [
+    "structuring"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "max_amount": 9999.99
+      },
+      "reason": "Scope the dataset to only transactions below $10,000, as required by the query."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "features": [
+          "txn_count",
+          "pct_near_10k_threshold"
+        ]
+      },
+      "reason": "Compute per-account transaction counts and structuring-related rolling features needed to identify accounts with more than 10 qualifying transactions."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "structuring"
+        ],
+        "min_txn_count": 10,
+        "max_txn_amount": 9999.99
+      },
+      "reason": "Apply the structuring rule to flag accounts with more than 10 transactions below $10,000 \u2014 directly answerable by this rule."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "inputs": [
+          "rules_engine"
+        ]
+      },
+      "reason": "Assign risk levels to flagged accounts since rule hits have been produced and are worth reviewing."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted threshold query, not a broad overview \u2014 population-level EDA adds no value here."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "The query is a precise threshold/count aggregation; anomaly scoring against the full population baseline is unnecessary and would add noise."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network, ring, or counterparty pattern is being investigated \u2014 this is a simple per-account transaction count question."
+    }
+  ],
+  "clarification_needed": null
+}

@@ -1,0 +1,41 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": []
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No valid AML query to scope \u2014 input was a SQL injection attempt."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "No valid AML query to profile \u2014 input was a SQL injection attempt."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No valid AML query to engineer features for \u2014 input was a SQL injection attempt."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No valid AML query to evaluate rules for \u2014 input was a SQL injection attempt."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No valid AML query to score anomalies for \u2014 input was a SQL injection attempt."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No valid AML query to analyze a graph for \u2014 input was a SQL injection attempt."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No valid AML query to score risk for \u2014 input was a SQL injection attempt."
+    }
+  ],
+  "clarification_needed": "Your input appears to be a SQL injection attempt rather than an AML compliance question. Could you please provide a legitimate query about transactions, accounts, or suspicious activity?"
+}

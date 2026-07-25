@@ -1,0 +1,65 @@
+{
+  "intent": "aggregate_threshold",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": []
+  },
+  "typologies": [
+    "structuring"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "max_amount": 9999.99
+      },
+      "reason": "Scope the dataset to only transactions under the $10,000 threshold before counting."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "metrics": [
+          "txn_count",
+          "pct_near_10k_threshold"
+        ]
+      },
+      "reason": "Compute per-account transaction counts and structuring-relevant features needed by the rules engine."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "structuring"
+        ],
+        "min_txn_count": 10,
+        "amount_ceiling": 9999.99
+      },
+      "reason": "Apply the structuring rule to identify accounts with 10+ payments under $10,000."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "inputs": [
+          "rules_engine"
+        ]
+      },
+      "reason": "Assign a risk level to each flagged account so analysts can prioritize their review."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted threshold/aggregation query, not a broad overview \u2014 EDA summary adds no value here."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "The question is a precise rule-based count check; anomaly scoring against the population baseline is unnecessary and would not change the answer."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network, ring, or counterparty pattern is being investigated \u2014 this is a single-entity threshold aggregation question."
+    }
+  ],
+  "clarification_needed": null
+}
