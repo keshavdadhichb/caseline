@@ -10,13 +10,13 @@
     {
       "tool": "profile_data",
       "params": {},
-      "reason": "The query is a broad overview request \u2014 profile_data is purpose-built to produce a high-level EDA summary including transaction count, accounts, date range, volume, and channel breakdown."
+      "reason": "The query is a broad overview request with no specific account, amount, or time scope. profile_data is purpose-built for this \u2014 it provides txn count, accounts, date range, volume, and channel breakdown."
     }
   ],
   "skipped": [
     {
       "tool": "filter_data",
-      "reason": "No date, amount, or account scoping was requested \u2014 the analyst wants a full-dataset overview, so no filtering is needed."
+      "reason": "No date, account, or amount filters were specified. The query asks for a full dataset overview, so no scoping is needed."
     },
     {
       "tool": "feature_engine",
@@ -24,15 +24,15 @@
     },
     {
       "tool": "rules_engine",
-      "reason": "No specific typology or threshold rule is being targeted in this overview query."
+      "reason": "No specific typology or threshold question was asked \u2014 this is a general overview."
     },
     {
       "tool": "anomaly_model",
-      "reason": "Anomaly scoring is not needed for a general overview \u2014 no suspicious activity detection was requested."
+      "reason": "No suspicion or anomaly detection was requested \u2014 this is a general overview."
     },
     {
       "tool": "graph_analysis",
-      "reason": "No network, ring, or counterparty pattern investigation was requested."
+      "reason": "No network, ring, or counterparty pattern was mentioned \u2014 not relevant for an overview."
     },
     {
       "tool": "risk_scorer",
