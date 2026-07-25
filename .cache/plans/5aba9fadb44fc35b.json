@@ -3,7 +3,7 @@
   "filters": {
     "window_days": null,
     "min_amount": null,
-    "accounts": []
+    "accounts": null
   },
   "typologies": [
     "structuring",
@@ -12,35 +12,6 @@
     "high_risk_amount"
   ],
   "steps": [],
-  "skipped": [
-    {
-      "tool": "filter_data",
-      "reason": "No date, account, or amount scope specified \u2014 nothing to filter on."
-    },
-    {
-      "tool": "profile_data",
-      "reason": "Query is too vague to even do a meaningful EDA without clarification."
-    },
-    {
-      "tool": "feature_engine",
-      "reason": "Cannot compute meaningful per-account features without knowing the scope or typology of interest."
-    },
-    {
-      "tool": "rules_engine",
-      "reason": "No typology or threshold specified to evaluate rules against."
-    },
-    {
-      "tool": "anomaly_model",
-      "reason": "Cannot run a population-baseline anomaly model without a defined dataset scope."
-    },
-    {
-      "tool": "graph_analysis",
-      "reason": "No entity or network pattern mentioned."
-    },
-    {
-      "tool": "risk_scorer",
-      "reason": "No detection outputs to score."
-    }
-  ],
-  "clarification_needed": "Could you clarify what you're looking for \u2014 e.g., a specific account, time window, transaction amount threshold, or typology (structuring, velocity, rapid movement, high-risk amounts)?"
+  "skipped": [],
+  "clarification_needed": "Can you narrow down what you're looking for \u2014 e.g., a specific account, time window, transaction amount threshold, or typology (structuring, velocity, rapid movement, high-risk amounts)?"
 }
