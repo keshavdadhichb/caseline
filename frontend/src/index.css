@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Caseline design tokens (CLAUDE.md — LAW).
+   Color means risk. Nothing else may use red/amber/green. */
+@theme {
+  --color-bg: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-ink: #16181d;
+  --color-muted: #5b6472;
+  --color-accent: #1f3a5f;
+  --color-risk-high: #b3261e;
+  --color-risk-med: #b45309;
+  --color-risk-low: #1e7b4f;
+  --color-hairline: #e4e7ec;
+
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-DEFAULT: 6px;
+}
+
+html {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* every numeric column reads in tabular figures */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
