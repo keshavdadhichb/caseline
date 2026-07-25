@@ -1,0 +1,27 @@
+# --- NEVER COMMIT: contest-confidential context ---
+HACKATHON.md
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Data: raw Kaggle downloads are too big & must not be pushed ---
+data/raw/
+*.zip
+
+# --- Caches / runtime ---
+.cache/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# --- Frontend ---
+node_modules/
+frontend/dist/
+
+# --- OS / editor ---
+.DS_Store
+.claude/
