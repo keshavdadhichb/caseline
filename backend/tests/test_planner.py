@@ -55,6 +55,37 @@ def test_plan_query_serves_cached_plan_when_llm_fails(monkeypatch, tmp_path):
     assert plan["intent"] == "detect_structuring"
 
 
+def test_call_llm_passes_an_explicit_timeout_to_the_sdk(monkeypatch):
+    """Regression test: the SDK's own default read timeout is 600s, and
+    nothing else in plan_query bounds how long a slow/degraded connection
+    (more likely at a demo venue than a clean network failure) can block
+    the synchronous POST /api/query handler — the `elapsed > 8s` check only
+    fires AFTER a call already returned. Without an explicit per-call
+    timeout, a hung request could block for up to 10 minutes with the
+    trace panel showing nothing. _call_llm must pass timeout=LIVE_TIMEOUT_SECONDS
+    through to messages.create so a slow call actually raises near the
+    documented 8s budget and falls through to the disk cache."""
+    captured_kwargs = {}
+
+    class _FakeMessages:
+        def create(self, **kwargs):
+            captured_kwargs.update(kwargs)
+            raise RuntimeError("stop before any real network call")
+
+    class _FakeClient:
+        def __init__(self, *a, **k):
+            self.messages = _FakeMessages()
+
+    monkeypatch.setattr(planner.anthropic, "Anthropic", _FakeClient)
+
+    try:
+        planner._call_llm("timeout plumbing check")
+    except RuntimeError:
+        pass
+
+    assert captured_kwargs.get("timeout") == planner.LIVE_TIMEOUT_SECONDS
+
+
 def test_plan_schema_names_match_actual_tool_catalog():
     """The tool names in the planner's schema/prompt must match the real
     backend tool modules — a renamed tool here would silently desync the
