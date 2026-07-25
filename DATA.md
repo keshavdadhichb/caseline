@@ -18,7 +18,15 @@ deterministic with fixed seeds (42 / 7).
 - **ALL labeled laundering transactions are preserved**, plus up to 80k
   transactions touching laundering counterparty accounts, plus a random fill.
 - `laundering_type` is parsed from `HI-Small_Patterns.txt` (FAN-OUT, FAN-IN,
-  CYCLE, GATHER-SCATTER, STACK, BIPARTITE, RANDOM).
+  CYCLE, GATHER-SCATTER, STACK, BIPARTITE, RANDOM) by matching each labeled
+  row's (timestamp, from, to, amount) against the patterns file. **Coverage
+  is ~62% of the 5,177 real IBM-labeled rows** — the patterns file does not
+  document every transaction the trans file marks `label=1`; the remainder
+  keep `label=1` with `laundering_type=None`. This is a property of the
+  upstream Kaggle files, not a Caseline join bug (see
+  `backend/tests/test_data_layer.py`). The 29 synthetic ring rows always
+  carry their typology (`SMURFING (synthetic)`) since they're Caseline's
+  own data, not a join.
 - `amount` is **normalized to USD** using fixed Sep-2022 reference rates
   (see `USD_RATES` in `data/prepare.py`); the original currency is kept in
   the `currency` column. All thresholds in Caseline are USD ($10,000

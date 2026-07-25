@@ -104,7 +104,15 @@ def main() -> None:
     rate = sample.currency.map(USD_RATES).fillna(1.0)
     sample["amount"] = (sample.amount_paid.astype(float) * rate).round(2)
 
-    sample = sample.sort_values("ts").reset_index(drop=True)
+    # kind="mergesort" (stable): the default quicksort doesn't preserve
+    # input order for tied timestamps (minute-granularity ts means many
+    # ties at 200k rows), so a fresh `make data` run could land same-minute
+    # transactions in a different relative order than a previous run even
+    # with identical fixed seeds — and since IsolationForest's seeded fit
+    # depends on row position, that could shift anomaly scores between
+    # runs. A stable sort makes tie order a pure function of the
+    # (seed-deterministic) pre-sort order.
+    sample = sample.sort_values("ts", kind="mergesort").reset_index(drop=True)
     sample["txn_id"] = ["T%06d" % i for i in range(len(sample))]
 
     out = sample[["txn_id", "ts", "from_account", "to_account", "amount",

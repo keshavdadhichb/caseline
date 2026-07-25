@@ -57,7 +57,13 @@ def main() -> None:
     ring["label"] = 1
     ring["laundering_type"] = MARK
 
-    out = pd.concat([df, ring[df.columns]]).sort_values("ts").reset_index(drop=True)
+    # kind="mergesort" (stable) — see the matching comment in prepare.py.
+    # It's what makes this idempotent in the byte-identical sense (not just
+    # same-rows-different-order): re-running against an already-injected
+    # file removes the 29 ring rows, and a stable re-sort of the remainder
+    # reproduces the exact same tie order it already had, so re-inserting
+    # the same (fixed-seed) ring rows lands them in the same position again.
+    out = pd.concat([df, ring[df.columns]]).sort_values("ts", kind="mergesort").reset_index(drop=True)
     out.to_csv(SAMPLE, index=False)
     print(f"injected {len(ring)} synthetic ring txns "
           f"(${total:,.0f} into {AGGREGATOR} from {len(MULES)} mules, "
