@@ -238,9 +238,16 @@ def plan_query(query: str, clarification_answer: str | None = None) -> dict:
         elapsed = time.monotonic() - t0
         if elapsed > LIVE_TIMEOUT_SECONDS and cache_path.exists():
             # slow but successful — still cache the fresh result for next time,
-            # but this run serves the last-known-good cached plan instead
-            cache_path.write_text(json.dumps(plan, indent=2))
+            # but this run serves the last-known-good cached plan instead.
+            # Order matters here: read the existing cache BEFORE overwriting
+            # it with the fresh plan. A prior version wrote first and read
+            # the file back after, which meant it always got back exactly
+            # what it had just written — the fresh (slow) plan — making this
+            # whole branch a no-op in practice; caught by a test that seeds
+            # a distinguishable "old" cached plan and checks it's what comes
+            # back, not the fresh one.
             cached = json.loads(cache_path.read_text())
+            cache_path.write_text(json.dumps(plan, indent=2))
             cached["_served_from_cache"] = True
             cached["_cache_reason"] = f"live call took {elapsed:.1f}s (> {LIVE_TIMEOUT_SECONDS}s budget)"
             return cached

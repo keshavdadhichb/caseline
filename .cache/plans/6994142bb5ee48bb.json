@@ -10,33 +10,33 @@
     {
       "tool": "profile_data",
       "params": {},
-      "reason": "The query is a broad overview request with no specific account, amount, or time scope. profile_data is purpose-built for this \u2014 it provides txn count, accounts, date range, volume, and channel breakdown."
+      "reason": "The query is a broad overview request with no specific account, amount, or typology scope. profile_data is purpose-built for this \u2014 it summarizes transaction count, accounts, date range, volume, and channel breakdown."
     }
   ],
   "skipped": [
     {
       "tool": "filter_data",
-      "reason": "No date, account, or amount filters were specified. The query asks for a full dataset overview, so no scoping is needed."
+      "reason": "No date, account, or amount filters were specified. The overview covers the full dataset, so scoping is unnecessary."
     },
     {
       "tool": "feature_engine",
-      "reason": "Per-account rolling features are not needed for a broad overview summary."
+      "reason": "Per-account rolling features are not needed for a broad dataset overview \u2014 no detection or scoring is requested."
     },
     {
       "tool": "rules_engine",
-      "reason": "No specific typology or threshold question was asked \u2014 this is a general overview."
+      "reason": "No specific typology or threshold question was asked \u2014 rule evaluation is not applicable here."
     },
     {
       "tool": "anomaly_model",
-      "reason": "No suspicion or anomaly detection was requested \u2014 this is a general overview."
+      "reason": "No suspicious activity detection was requested. This is a pure overview query."
     },
     {
       "tool": "graph_analysis",
-      "reason": "No network, ring, or counterparty pattern was mentioned \u2014 not relevant for an overview."
+      "reason": "No network, ring, or counterparty investigation was requested."
     },
     {
       "tool": "risk_scorer",
-      "reason": "No detection tools are running, so there are no flags to score."
+      "reason": "No flags or detections are being produced, so there is nothing to score."
     }
   ],
   "clarification_needed": null
