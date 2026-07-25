@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 import tools.anomaly_model as anomaly_model_module
-from tools.anomaly_model import anomaly_model, normalize_anomaly_score
+from tools.anomaly_model import anomaly_model, is_anomaly_high, normalize_anomaly_score
 from tools.feature_engine import feature_engine
 from tests.fixtures import build_fixture
 
@@ -20,11 +20,12 @@ FEATURES = feature_engine(build_fixture())
 
 def test_baseline_refit_twice_is_byte_identical():
     anomaly_model_module._baseline.cache_clear()
-    _, median1, p99_1 = anomaly_model_module._baseline()
+    _, median1, p99_1, top1 = anomaly_model_module._baseline()
     anomaly_model_module._baseline.cache_clear()
-    _, median2, p99_2 = anomaly_model_module._baseline()
+    _, median2, p99_2, top2 = anomaly_model_module._baseline()
     assert median1 == median2
     assert p99_1 == p99_2
+    assert top1 == top2
 
 
 def test_scoring_the_same_subset_twice_after_refit_gives_identical_scores():
@@ -59,6 +60,21 @@ def test_normalized_score_is_always_within_zero_one():
 def test_normalize_handles_degenerate_population_without_dividing_by_zero(monkeypatch):
     """If p99 <= median (a degenerate/near-constant population), the
     function must return all-zero rather than divide by zero."""
-    monkeypatch.setattr(anomaly_model_module, "_baseline", lambda: (None, 0.5, 0.5))
+    monkeypatch.setattr(anomaly_model_module, "_baseline", lambda: (None, 0.5, 0.5, 0.5))
     result = normalize_anomaly_score(pd.Series([0.1, 0.9], index=["X", "Y"]))
     assert (result == 0.0).all()
+
+
+def test_is_anomaly_high_uses_the_top_percentile_not_the_normalized_floor(monkeypatch):
+    monkeypatch.setattr(anomaly_model_module, "_baseline", lambda: (None, 0.0, 10.0, 8.0))
+    result = is_anomaly_high(pd.Series([7.9, 8.0, 8.1, 100.0], index=["a", "b", "c", "d"]))
+    assert result.tolist() == [False, True, True, True]
+
+
+def test_anomaly_top_percentile_matches_step0_base_rate_order_of_magnitude():
+    """Not a claim that 95.0 is derived by formula from 4.22% — it's a
+    clean round number in the right neighborhood, documented in
+    anomaly_model.py and METHODOLOGY.md. This just guards against someone
+    quietly reverting it back toward the old, much-more-permissive
+    ANOMALY_CANDIDATE_FLOOR-style behavior without noticing."""
+    assert 90.0 <= anomaly_model_module.ANOMALY_TOP_PERCENTILE <= 98.0

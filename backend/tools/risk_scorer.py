@@ -1,8 +1,26 @@
 """risk_scorer — combines rule hits + anomaly score + graph findings into
-LOW/MEDIUM/HIGH with a weighted, printed formula. Hybrid scoring is the
-story: rules give precision + explainability, the model catches what rules
-miss, the graph catches networks — every score's explanation says which of
-the three fired.
+LOW/MEDIUM/HIGH via CORROBORATION between independent detection methods,
+plus a weighted, printed score used for ranking within and across tiers.
+
+Tier assignment is corroboration-based, not a single blended number
+crossing a cutoff: a single detection method — even a confident one —
+produced too many single-signal HIGH flags to be a credible "report this"
+tier (see METHODOLOGY.md for the before/after numbers). The three
+methods (rules, graph, anomaly model) fail in different, largely
+independent ways, so two of them agreeing is real evidence in a way that
+one strong signal alone is not:
+
+  HIGH   — a named rule fired AND at least one of (graph finding, anomaly
+           score in the population's own top tier). Two independent
+           detection methods agreeing.
+  MEDIUM — exactly one detection method fired: a rule alone, or a graph
+           finding alone (with no rule).
+  LOW    — anomaly score alone, with no rule and no graph corroboration.
+
+`score` (the old weighted formula) is kept for ranking — "the top 50
+accounts by risk score" (used for Precision@N in evals/baseline.py) needs
+a continuous ordering, and tier alone can't rank within a 1000-account
+MEDIUM bucket. It no longer determines risk_level.
 """
 
 from __future__ import annotations
@@ -11,7 +29,7 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
-from tools.anomaly_model import normalize_anomaly_score
+from tools.anomaly_model import is_anomaly_high, normalize_anomaly_score
 from tools.graph_analysis import GraphFlag
 from tools.rules_engine import Flag
 
@@ -19,15 +37,14 @@ WEIGHT_RULES = 0.45
 WEIGHT_GRAPH = 0.35
 WEIGHT_ANOMALY = 0.20
 FORMULA = (
-    f"risk_score = {WEIGHT_RULES:.2f} x rules_component "
+    f"risk_score (ranking only) = {WEIGHT_RULES:.2f} x rules_component "
     f"+ {WEIGHT_GRAPH:.2f} x graph_component "
-    f"+ {WEIGHT_ANOMALY:.2f} x anomaly_component"
+    f"+ {WEIGHT_ANOMALY:.2f} x anomaly_component; "
+    "risk_level (tier) = HIGH if rule AND (graph OR anomaly-high), "
+    "MEDIUM if exactly one of {rule, graph}, LOW if anomaly-high alone"
 )
 
 RULES_SATURATION_COUNT = 2  # >=2 distinct rule typologies -> rules_component maxes at 1.0
-ANOMALY_CANDIDATE_FLOOR = 0.5  # anomaly-only accounts still surface if the model is confident
-HIGH_THRESHOLD = 0.60
-MEDIUM_THRESHOLD = 0.30
 
 
 @dataclass
@@ -63,35 +80,39 @@ def risk_scorer(
 
     if scored_features is None or scored_features.empty:
         anomaly_norm = pd.Series(dtype=float)
+        anomaly_high = pd.Series(dtype=bool)
     else:
-        anomaly_norm = normalize_anomaly_score(
-            scored_features.set_index("account_id")["anomaly_score"]
-        )
+        raw = scored_features.set_index("account_id")["anomaly_score"]
+        anomaly_norm = normalize_anomaly_score(raw)
+        anomaly_high = is_anomaly_high(raw)
 
-    candidates = (
-        set(rules_by_account)
-        | set(graph_by_account)
-        | set(anomaly_norm[anomaly_norm >= ANOMALY_CANDIDATE_FLOOR].index)
-    )
+    high_anomaly_accounts = set(anomaly_high[anomaly_high].index)
+
+    candidates = set(rules_by_account) | set(graph_by_account) | high_anomaly_accounts
 
     records: list[RiskRecord] = []
     for account_id in candidates:
         rules_fired = sorted(rules_by_account.get(account_id, set()))
         graph_fired = sorted(graph_by_account.get(account_id, set()))
         a_component = float(anomaly_norm.get(account_id, 0.0))
+        a_is_high = account_id in high_anomaly_accounts
+
+        has_rule = bool(rules_fired)
+        has_graph = bool(graph_fired)
+
+        if has_rule and (has_graph or a_is_high):
+            risk_level = "HIGH"
+        elif has_rule or has_graph:
+            risk_level = "MEDIUM"
+        else:
+            risk_level = "LOW"  # a_is_high alone — the only other way to be a candidate at all
 
         rules_component = min(1.0, len(rules_fired) / RULES_SATURATION_COUNT)
         graph_component = 1.0 if graph_fired else 0.0
-
         score = (
             WEIGHT_RULES * rules_component
             + WEIGHT_GRAPH * graph_component
             + WEIGHT_ANOMALY * a_component
-        )
-        risk_level = (
-            "HIGH" if score >= HIGH_THRESHOLD else
-            "MEDIUM" if score >= MEDIUM_THRESHOLD else
-            "LOW"
         )
 
         fired_summary = []
@@ -99,8 +120,8 @@ def risk_scorer(
             fired_summary.append(f"rules: {', '.join(rules_fired)}")
         if graph_fired:
             fired_summary.append(f"graph: {', '.join(graph_fired)}")
-        if a_component >= ANOMALY_CANDIDATE_FLOOR:
-            fired_summary.append(f"anomaly model: {a_component:.2f} (population-normalized)")
+        if a_is_high:
+            fired_summary.append(f"anomaly model: {a_component:.2f} (population top-tier)")
 
         records.append(RiskRecord(
             account_id=account_id,

@@ -1,9 +1,14 @@
-"""risk_scorer — the weighted formula against fully hand-constructed inputs
-(no CSV, no real dataset). `normalize_anomaly_score` is monkeypatched to an
-identity pass-through so anomaly_component values are exactly what the test
-supplies, rather than depending on the real 200k-row population's
-median/p99 baseline — that keeps this a pure, fast, hand-checkable unit
-test of the formula itself, independent of the live dataset.
+"""risk_scorer — the corroboration-tier logic against fully hand-constructed
+inputs (no CSV, no real dataset). `is_anomaly_high` is monkeypatched to a
+direct set-membership check so tier assignment is exactly what the test
+supplies, rather than depending on the real 200k-row population's top-5%
+threshold — that keeps this a pure, fast, hand-checkable unit test of the
+tiering logic itself, independent of the live dataset.
+
+Tier rule under test (see risk_scorer.py's module docstring):
+  HIGH   = rule AND (graph OR anomaly-high)   — two independent methods agree
+  MEDIUM = exactly one of {rule, graph}
+  LOW    = anomaly-high alone
 """
 
 from __future__ import annotations
@@ -13,16 +18,18 @@ import pytest
 
 import tools.risk_scorer as risk_scorer_module
 from tools.graph_analysis import GraphFlag
-from tools.risk_scorer import (
-    HIGH_THRESHOLD, MEDIUM_THRESHOLD, WEIGHT_ANOMALY, WEIGHT_GRAPH, WEIGHT_RULES,
-    risk_scorer,
-)
+from tools.risk_scorer import WEIGHT_ANOMALY, WEIGHT_GRAPH, WEIGHT_RULES, risk_scorer
 from tools.rules_engine import Flag
 
 
 @pytest.fixture(autouse=True)
-def _identity_anomaly_normalization(monkeypatch):
+def _controlled_anomaly(monkeypatch):
+    """normalize_anomaly_score stays a pass-through (continuous value used
+    for ranking); is_anomaly_high is driven by a simple >=1.0 check on
+    that same pass-through value, so a test can request "high" by scoring
+    an account at 1.0+ and "not high" by scoring it below 1.0."""
     monkeypatch.setattr(risk_scorer_module, "normalize_anomaly_score", lambda s: s)
+    monkeypatch.setattr(risk_scorer_module, "is_anomaly_high", lambda s: s >= 1.0)
 
 
 def _rule_flag(account_id: str, typology: str) -> Flag:
@@ -38,109 +45,108 @@ def _scored(account_id: str, anomaly_score: float) -> pd.DataFrame:
     return pd.DataFrame([{"account_id": account_id, "anomaly_score": anomaly_score}])
 
 
-def test_single_rule_hit_scores_below_saturation():
+def test_rule_alone_is_medium():
     records = risk_scorer([_rule_flag("A", "STRUCTURING")], [], None)
     rec = records[0]
-    expected = WEIGHT_RULES * 0.5  # 1 of 2 typologies needed to saturate
-    assert rec.score == pytest.approx(round(expected, 3))
-    assert rec.risk_level == "LOW"
-    assert rec.anomaly_component == 0.0
+    assert rec.risk_level == "MEDIUM"
     assert "rules" in rec.explanation.lower()
     assert "graph" not in rec.explanation.lower()
     assert "anomaly" not in rec.explanation.lower()
 
 
-def test_two_distinct_rules_saturate_the_rules_component():
-    records = risk_scorer(
-        [_rule_flag("A", "STRUCTURING"), _rule_flag("A", "VELOCITY")], [], None
-    )
-    rec = records[0]
-    assert rec.score == pytest.approx(round(WEIGHT_RULES * 1.0, 3))
-    assert rec.risk_level == "MEDIUM"
-    assert MEDIUM_THRESHOLD <= rec.score < HIGH_THRESHOLD
-
-
-def test_a_third_distinct_rule_does_not_increase_the_component_further():
-    two = risk_scorer([_rule_flag("A", "STRUCTURING"), _rule_flag("A", "VELOCITY")], [], None)[0]
-    three = risk_scorer(
-        [_rule_flag("A", "STRUCTURING"), _rule_flag("A", "VELOCITY"), _rule_flag("A", "RAPID_MOVEMENT")], [], None
-    )[0]
-    assert three.score == two.score
-
-
-def test_graph_only_hit_scores_from_graph_weight_alone():
+def test_graph_alone_is_medium():
     records = risk_scorer([], [_graph_flag("B")], None)
     rec = records[0]
-    assert rec.score == pytest.approx(round(WEIGHT_GRAPH * 1.0, 3))
     assert rec.risk_level == "MEDIUM"
     assert "graph" in rec.explanation.lower()
     assert "rules" not in rec.explanation.lower()
 
 
-def test_all_three_signals_saturated_scores_high_and_cites_all_three():
+def test_multiple_distinct_rules_alone_is_still_medium_not_high():
+    """Three rule typologies firing on the same account is still just ONE
+    detection method (rules) — not "two independent signals agreeing"."""
     records = risk_scorer(
-        [_rule_flag("C", "STRUCTURING"), _rule_flag("C", "VELOCITY")],
-        [_graph_flag("C")],
-        _scored("C", 1.0),
+        [_rule_flag("A", "STRUCTURING"), _rule_flag("A", "VELOCITY"), _rule_flag("A", "RAPID_MOVEMENT")], [], None
     )
     rec = records[0]
-    assert rec.score == pytest.approx(1.0)
+    assert rec.risk_level == "MEDIUM"
+
+
+def test_rule_plus_graph_is_high():
+    records = risk_scorer([_rule_flag("C", "STRUCTURING")], [_graph_flag("C")], None)
+    rec = records[0]
     assert rec.risk_level == "HIGH"
     assert "rules" in rec.explanation.lower()
     assert "graph" in rec.explanation.lower()
+
+
+def test_rule_plus_high_anomaly_is_high():
+    records = risk_scorer([_rule_flag("D", "STRUCTURING")], [], _scored("D", 1.0))
+    rec = records[0]
+    assert rec.risk_level == "HIGH"
     assert "anomaly" in rec.explanation.lower()
 
 
-def test_anomaly_only_below_candidate_floor_is_not_a_candidate_at_all():
-    """An account with NO rule/graph hit and an anomaly score under the
-    0.5 candidate floor should not appear in the output at all — the floor
-    exists so the anomaly model alone can't surface noise."""
-    records = risk_scorer([], [], _scored("D", 0.49))
+def test_rule_plus_low_anomaly_stays_medium():
+    """Anomaly score present but below the top-tier bar — not corroboration."""
+    records = risk_scorer([_rule_flag("E", "STRUCTURING")], [], _scored("E", 0.5))
+    rec = records[0]
+    assert rec.risk_level == "MEDIUM"
+    assert "anomaly" not in rec.explanation.lower()
+
+
+def test_anomaly_alone_is_low():
+    records = risk_scorer([], [], _scored("F", 1.0))
+    rec = records[0]
+    assert rec.risk_level == "LOW"
+    assert rec.anomaly_only is True
+    assert "anomaly" in rec.explanation.lower()
+
+
+def test_anomaly_below_top_tier_alone_is_not_a_candidate_at_all():
+    records = risk_scorer([], [], _scored("G", 0.9))
     assert records == []
 
 
-def test_anomaly_only_at_exactly_the_candidate_floor_is_included():
-    records = risk_scorer([], [], _scored("D", 0.5))
-    assert len(records) == 1
+def test_graph_plus_high_anomaly_without_a_rule_is_still_medium_not_high():
+    """HIGH specifically requires a RULE plus corroboration — graph and
+    anomaly agreeing with each other, with no rule at all, is not the
+    documented HIGH condition."""
+    records = risk_scorer([], [_graph_flag("H")], _scored("H", 1.0))
     rec = records[0]
-    assert rec.anomaly_only is True
-    assert rec.score == pytest.approx(round(WEIGHT_ANOMALY * 0.5, 3))
-    assert "anomaly" in rec.explanation.lower()
+    assert rec.risk_level == "MEDIUM"
 
 
-def test_skipped_anomaly_model_scores_correctly_with_only_rules():
-    """scored_features=None (anomaly_model skipped) must behave identically
-    to it never having contributed — not as a score of 0.0 on its own scale."""
-    with_none = risk_scorer([_rule_flag("E", "STRUCTURING")], [], None)[0]
-    with_empty = risk_scorer([_rule_flag("E", "STRUCTURING")], [], pd.DataFrame(columns=["account_id", "anomaly_score"]))[0]
-    assert with_none.score == with_empty.score == pytest.approx(round(WEIGHT_RULES * 0.5, 3))
+def test_skipped_anomaly_model_none_never_contributes_to_high():
+    with_none = risk_scorer([_rule_flag("I", "STRUCTURING")], [], None)[0]
+    assert with_none.risk_level == "MEDIUM"
     assert with_none.anomaly_component == 0.0
 
 
-def test_records_sorted_by_score_descending():
+def test_score_still_ranks_high_above_medium_above_low():
     records = risk_scorer(
-        [_rule_flag("LOW-ONE", "STRUCTURING"),
-         _rule_flag("HIGH-ONE", "STRUCTURING"), _rule_flag("HIGH-ONE", "VELOCITY")],
-        [_graph_flag("HIGH-ONE")],
-        None,
+        [_rule_flag("HIGH-ACCT", "STRUCTURING"), _rule_flag("MED-ACCT", "STRUCTURING")],
+        [_graph_flag("HIGH-ACCT")],
+        _scored("LOW-ACCT", 1.0),
     )
-    assert [r.account_id for r in records] == ["HIGH-ONE", "LOW-ONE"]
+    levels = {r.account_id: r.risk_level for r in records}
+    assert levels["HIGH-ACCT"] == "HIGH"
+    assert levels["MED-ACCT"] == "MEDIUM"
+    assert levels["LOW-ACCT"] == "LOW"
+    scores = {r.account_id: r.score for r in records}
+    assert scores["HIGH-ACCT"] > scores["MED-ACCT"] > scores["LOW-ACCT"]
+    assert [r.account_id for r in records] == ["HIGH-ACCT", "MED-ACCT", "LOW-ACCT"]
 
 
-def test_high_and_medium_threshold_boundaries():
-    # rules saturated (0.45) + graph (0.35) = 0.80 -> HIGH
-    high = risk_scorer(
-        [_rule_flag("H", "STRUCTURING"), _rule_flag("H", "VELOCITY")], [_graph_flag("H")], None
+def test_formula_weights_still_drive_the_ranking_score():
+    # rules saturated (2 distinct typologies) + graph -> 0.45 + 0.35 = 0.80
+    rec = risk_scorer(
+        [_rule_flag("J", "STRUCTURING"), _rule_flag("J", "VELOCITY")], [_graph_flag("J")], None
     )[0]
-    assert high.score >= HIGH_THRESHOLD
-    assert high.risk_level == "HIGH"
+    assert rec.score == pytest.approx(round(WEIGHT_RULES * 1.0 + WEIGHT_GRAPH * 1.0, 3))
+    assert rec.risk_level == "HIGH"  # rule + graph corroboration, regardless of the score's magnitude
 
-    # graph alone (0.35) -> MEDIUM (>= 0.30, < 0.60)
-    medium = risk_scorer([], [_graph_flag("M")], None)[0]
-    assert MEDIUM_THRESHOLD <= medium.score < HIGH_THRESHOLD
-    assert medium.risk_level == "MEDIUM"
 
-    # single rule alone (0.225) -> LOW (< 0.30)
-    low = risk_scorer([_rule_flag("L", "STRUCTURING")], [], None)[0]
-    assert low.score < MEDIUM_THRESHOLD
-    assert low.risk_level == "LOW"
+def test_records_include_anomaly_component_for_ranking_even_at_low_tier():
+    rec = risk_scorer([], [], _scored("K", 1.0))[0]
+    assert rec.score == pytest.approx(round(WEIGHT_ANOMALY * 1.0, 3))

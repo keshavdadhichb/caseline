@@ -136,13 +136,23 @@ def test_run_plan_does_not_draft_sars_even_for_many_high_cases():
     """run_plan must stay fast regardless of HIGH-case count — a broad query
     can surface hundreds of HIGH accounts, and drafting a narrative for each
     up-front is exactly what blew the per-query budget before drafting went
-    lazy. No case should come back with a narrative from the run itself."""
+    lazy. No case should come back with a narrative from the run itself.
+
+    Only the aggregator (4521) is HIGH now, not aggregator+9 mules: after
+    STRUCTURING was tightened to receiver-side + consolidation (see
+    rules_engine.py and METHODOLOGY.md), the mules — who only ever SEND 3
+    sub-threshold deposits each and never consolidate anything themselves —
+    no longer trip a rule on their own. risk_scorer's HIGH tier requires a
+    rule AND corroboration; a mule now has only FAN_IN_RING (graph alone),
+    which is MEDIUM, not HIGH. They're still part of the case via the ring
+    subgraph (test_hybrid.py) — just not individually HIGH anymore."""
     df = load_transactions()
     events: list[dict] = []
     outcome = run_plan(df, ENTITY_LOOKUP_PLAN, events)
 
     high_cases = [c for c in outcome["cases"] if c["risk_level"] == "HIGH"]
-    assert len(high_cases) == 10  # ring aggregator + 9 mules
+    assert len(high_cases) == 1
+    assert high_cases[0]["account_id"] == "4521"
     assert all(c["narrative"] is None for c in high_cases)
     assert not any(e["step"] == "sar_drafter" for e in events)
 

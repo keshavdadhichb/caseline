@@ -46,12 +46,12 @@ def graph_analysis(df: pd.DataFrame) -> list[GraphFlag]:
     if df.empty:
         return []
     g = build_graph(df)
-    flags = _fan_in(df, g)
+    flags = _fan_in(df)
     flags += _cycles(g)
     return flags
 
 
-def _fan_in(df: pd.DataFrame, g: nx.DiGraph) -> list[GraphFlag]:
+def _fan_in(df: pd.DataFrame) -> list[GraphFlag]:
     """>=5 distinct senders -> 1 receiver within 7 days, receiver then
     consolidates a majority of it back out (distinguishes a real "gather"
     ring from a merchant/payroll account that just has many payers).
@@ -60,11 +60,31 @@ def _fan_in(df: pd.DataFrame, g: nx.DiGraph) -> list[GraphFlag]:
     frame) so the expensive per-receiver windowed scan only runs on
     genuine candidates — iterating a Python-level loop over every one of
     ~140k receivers costs seconds on its own and blows the query budget.
+
+    total_out is scoped to the receiver's outbound transactions within
+    FAN_IN_WINDOW_DAYS of the inbound cluster closing — NOT the receiver's
+    entire outbound history. An earlier version summed ALL of `g`'s
+    out-edges for the receiver regardless of when they happened, which let
+    consolidation_ratio exceed 1000% for any high-volume hub account with
+    substantial unrelated outbound activity (any bank, payment processor,
+    or busy merchant) — it was measuring "does this account send at least
+    as much as it received this week, ever, across its whole history",
+    not "did THIS gathered batch actually move back out", which is what
+    the typology is supposed to mean. Caught when the corroboration-based
+    HIGH tier (risk_scorer.py) made FAN_IN_RING's real-world false-positive
+    rate visible for the first time — the old weighted-sum formula's 0.35
+    graph weight alone couldn't reach HIGH on its own, so this was quietly
+    inflating MEDIUM-tier volume unnoticed.
     """
     sender_counts = df.groupby("to_account")["from_account"].nunique()
     candidates = sender_counts[sender_counts >= FAN_IN_MIN_SENDERS].index
     if len(candidates) == 0:
         return []
+
+    outbound_by_receiver = {
+        account_id: group[["ts", "amount"]].sort_values("ts")
+        for account_id, group in df[df.from_account.isin(candidates)].groupby("from_account")
+    }
 
     flags: list[GraphFlag] = []
     window_seconds = FAN_IN_WINDOW_DAYS * 86_400
@@ -102,15 +122,22 @@ def _fan_in(df: pd.DataFrame, g: nx.DiGraph) -> list[GraphFlag]:
         found = g2.iloc[best_lo:best_hi + 1]
 
         total_in = float(found["amount"].sum())
-        out_edges = list(g.out_edges(receiver, data=True))
-        total_out = sum(d["amount"] for _, _, d in out_edges)
-        ratio = (total_out / total_in) if total_in > 0 else 0.0
+
+        window_end = times[best_hi]
+        consolidation_end = window_end + pd.Timedelta(seconds=window_seconds)
+        outbound = outbound_by_receiver.get(receiver)
+        if outbound is None:
+            continue  # gathered funds but never sent anything out at all — not a "scatter"
+        scattered = outbound.loc[(outbound["ts"] > window_end) & (outbound["ts"] <= consolidation_end)]
+        total_out = float(scattered["amount"].sum())
+        ratio = min(1.0, total_out / total_in) if total_in > 0 else 0.0
         if ratio < FAN_IN_CONSOLIDATION_RATIO:
             continue
 
         ring_accounts = sorted(set(found["from_account"]) | {receiver})
         edges = [(r.from_account, r.to_account, float(r.amount)) for r in found.itertuples()]
-        edges += [(receiver, dst, float(d["amount"])) for _, dst, d in out_edges]
+        out_txns = df[(df.from_account == receiver) & (df.ts > window_end) & (df.ts <= consolidation_end)]
+        edges += [(receiver, r.to_account, float(r.amount)) for r in out_txns.itertuples()]
         flags.append(GraphFlag(
             account_id=receiver,
             typology="FAN_IN_RING",

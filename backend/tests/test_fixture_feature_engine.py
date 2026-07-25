@@ -22,20 +22,26 @@ def _row(account_id: str):
     return r.iloc[0]
 
 
-def test_struct_pos_sender_only_account():
+def test_struct_pos_receiver_then_consolidator_account():
+    """STRUCT-POS receives 5 near-threshold deposits then sends one
+    consolidation leg out — 6 total transactions, not 5 (see fixtures.py:
+    the structuring rule is receiver-side + consolidation now, so the
+    account is no longer sender-only)."""
     row = _row("STRUCT-POS")
-    amounts = [9200, 9400, 9600, 9800, 9850]
-    assert row.n_txns == 5
-    assert row.mean_amount == pytest.approx(statistics.mean(amounts))
-    assert row.std_amount == pytest.approx(statistics.pstdev(amounts))
-    assert row.near_threshold_count == 5
-    assert row.pct_near_threshold == pytest.approx(1.0)
-    assert row.inbound_amount == pytest.approx(0.0)
-    assert row.outbound_amount == pytest.approx(sum(amounts))
-    assert row.outbound_within_48h == pytest.approx(0.0), "never received, so no 48h anchor exists"
-    assert row.rapid_inout_ratio == pytest.approx(0.0)
+    deposits = [9600, 9650, 9700, 9750, 9800]
+    outbound_leg = sum(deposits) * 0.65
+    combined = deposits + [outbound_leg]
+    assert row.n_txns == 6
+    assert row.mean_amount == pytest.approx(statistics.mean(combined))
+    assert row.std_amount == pytest.approx(statistics.pstdev(combined))
+    assert row.near_threshold_count == 5  # the outbound leg (31,525) isn't in [9500,10000)
+    assert row.pct_near_threshold == pytest.approx(5 / 6)
+    assert row.inbound_amount == pytest.approx(sum(deposits))
+    assert row.outbound_amount == pytest.approx(outbound_leg)
+    assert row.outbound_within_48h == pytest.approx(outbound_leg), "the consolidation leg lands within 48h of the last deposit"
+    assert row.rapid_inout_ratio == pytest.approx(0.65)
     assert row.hourly_count_max == 1
-    assert row.hourly_count_std == pytest.approx(0.0), "5 distinct days -> 5 distinct hour buckets"
+    assert row.hourly_count_std == pytest.approx(0.0), "6 distinct days -> 6 distinct hour buckets"
 
 
 def test_fanin_agg_mixed_direction_account():

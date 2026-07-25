@@ -20,7 +20,7 @@ FEATURE_COLUMNS = [
     "hourly_count_mean", "hourly_count_std", "hourly_count_max",
     "near_threshold_count", "pct_near_threshold",
     "inbound_amount", "outbound_amount", "outbound_within_48h",
-    "rapid_inout_ratio",
+    "rapid_inout_ratio", "inbound_sender_count",
 ]
 
 
@@ -58,10 +58,17 @@ def feature_engine(df: pd.DataFrame) -> pd.DataFrame:
 
     inbound = df.groupby("to_account")["amount"].sum().rename("inbound_amount")
     outbound = df.groupby("from_account")["amount"].sum().rename("outbound_amount")
+    # Distinct senders, not just total inbound volume — RAPID_MOVEMENT uses
+    # this to require money arriving from more than one source before a
+    # fast in-and-out counts as a signal (a single counterparty sending
+    # funds that promptly leave again is normal treasury/settlement
+    # behavior, not a smurfing-style gather-and-scatter).
+    inbound_sender_count = df.groupby("to_account")["from_account"].nunique().rename("inbound_sender_count")
 
     feat = pd.concat([n_txns, mean_amount, std_amount, near_count], axis=1).fillna(0.0)
     feat = feat.join(hourly_stats, how="left").fillna(0.0)
     feat = feat.join(inbound, how="left").join(outbound, how="left").fillna(0.0)
+    feat = feat.join(inbound_sender_count, how="left").fillna(0.0)
     feat["pct_near_threshold"] = (feat["near_threshold_count"] / feat["n_txns"]).fillna(0.0)
 
     feat["outbound_within_48h"] = _outbound_within_48h(df)

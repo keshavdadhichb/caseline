@@ -71,26 +71,54 @@ def _epoch(n: int) -> pd.Timestamp:
 
 
 # ---------------------------------------------------------------------------
-# 1. STRUCTURING — positive, negative, boundary (all sender-side, into SINK-1)
+# 1. STRUCTURING — positive, two negatives, and boundary. Post-tightening
+# (see rules_engine.py's module docstring / METHODOLOGY.md): receiver-side
+# only, >=5 deposits (not 3) in [$9,500, $10,000) (5% band, not 10%), AND
+# >=60% of that total consolidated back out within 7 days of the window
+# closing. All deposits come from a SINGLE shared "-IN" counterparty
+# (deliberately not 5 distinct senders): STRUCTURING doesn't care who sent
+# the money, only who received and then moved it — but 5 distinct senders
+# would ALSO satisfy FAN_IN_MIN_SENDERS, accidentally co-triggering
+# FAN_IN_RING on the same account (an earlier version of this fixture did
+# exactly that). A single sender keeps this scenario an isolated test of
+# structuring alone.
 # ---------------------------------------------------------------------------
 _e = _epoch(0)
 STRUCT_POS_TXN_IDS = [
-    _add(_e + pd.Timedelta(days=d, hours=9), "STRUCT-POS", "SINK-1", amt)
-    for d, amt in zip([0, 1, 2, 4, 5], [9200, 9400, 9600, 9800, 9850])
+    _add(_e + pd.Timedelta(days=d, hours=9), "STRUCT-POS-IN", "STRUCT-POS", amt)
+    for d, amt in zip([0, 1, 2, 3, 4], [9600, 9650, 9700, 9750, 9800])
 ]
-# rules_engine breaks on the FIRST window that clears the count-3 threshold,
-# so evidence covers only the first 3 (days 0,1,2) even though all 5 qualify.
-STRUCT_POS_EXPECTED_FLAG_TXN_IDS = STRUCT_POS_TXN_IDS[:3]
+STRUCT_POS_TOTAL_IN = 9600 + 9650 + 9700 + 9750 + 9800  # 48,500
+_add(_e + pd.Timedelta(days=6), "STRUCT-POS", "STRUCT-POS-OUT", STRUCT_POS_TOTAL_IN * 0.65)  # 65% >= 60% required
 
-STRUCT_NEG_TXN_IDS = [
-    _add(_e + pd.Timedelta(days=d, hours=9), "STRUCT-NEG", "SINK-1", amt)
-    for d, amt in zip([0, 20, 40], [9100, 9300, 9500])
-]  # 20-day gaps: no 3 ever fall inside a 7-day window
+# Negative #1 — the user's own contrasting case: "a legitimate retail
+# business makes frequent sub-threshold deposits but leaves the funds in
+# place." Same qualifying count/band/window as the positive case, but NO
+# outbound consolidation afterward.
+STRUCT_NEG_NOCONSOL_TXN_IDS = [
+    _add(_e + pd.Timedelta(days=d, hours=9), "STRUCT-NEG-NOCONSOL-IN", "STRUCT-NEG-NOCONSOL", amt)
+    for d, amt in zip([0, 1, 2, 3, 4], [9600, 9650, 9700, 9750, 9800])
+]  # no outbound leg at all -> consolidation_ratio == 0.0
 
+# Negative #2 — qualifying count and band, but spread across 40 days so no
+# 5 of them ever land inside a single 7-day window (tests the window
+# requirement specifically, independent of the consolidation requirement).
+STRUCT_NEG_SPREAD_TXN_IDS = [
+    _add(_e + pd.Timedelta(days=d, hours=9), "STRUCT-NEG-SPREAD-IN", "STRUCT-NEG-SPREAD", amt)
+    for d, amt in zip([0, 10, 20, 30, 40], [9600, 9650, 9700, 9750, 9800])
+]
+
+# Boundary — exactly 5 deposits (== STRUCTURING_MIN_COUNT) of exactly
+# $9,500.00 (== NEAR_THRESHOLD_LOW, inclusive) within 7 days, then exactly
+# 60% (== STRUCTURING_CONSOLIDATION_RATIO, inclusive via >=) consolidated
+# out within exactly 7 days of the window closing.
 STRUCT_BOUND_TXN_IDS = [
-    _add(_e + pd.Timedelta(days=d, hours=9), "STRUCT-BOUND", "SINK-1", 9000.00)
-    for d in [0, 3, 6]
-]  # exactly $9,000.00 == NEAR_THRESHOLD_LOW, inclusive boundary; count==3==MIN
+    _add(_e + pd.Timedelta(days=d, hours=9), "STRUCT-BOUND-IN", "STRUCT-BOUND", 9500.00)
+    for d in [0, 1, 2, 3, 4]
+]
+STRUCT_BOUND_TOTAL_IN = 5 * 9500.00  # 47,500
+_add(_e + pd.Timedelta(days=4, hours=9) + pd.Timedelta(days=7), "STRUCT-BOUND", "STRUCT-BOUND-OUT",
+     STRUCT_BOUND_TOTAL_IN * 0.60)  # exactly 60%, exactly 7 days after window_end (inclusive: ts <= window_end+7d)
 
 # ---------------------------------------------------------------------------
 # 2. FAN_IN_RING + RAPID_MOVEMENT positive (spec's own story: "fan-in plus
@@ -207,20 +235,31 @@ for d, amt in zip(range(4), [100, 110, 95, 105]):
     _add(_e + pd.Timedelta(days=d), "HNEG-SRC", "HNEG-SINK", amt)
 
 # ---------------------------------------------------------------------------
-# 9. RAPID_MOVEMENT negative, boundary, and a materiality-floor regression
-#    case (RAPID_MOVEMENT_MIN_INBOUND — see rules_engine.py history).
+# 9. RAPID_MOVEMENT negative, boundary, and two regression cases
+#    (RAPID_MOVEMENT_MIN_INBOUND materiality floor, and the newer
+#    RAPID_MOVEMENT_MIN_SOURCES funnel-vs-two-party guard). Every scenario
+#    here uses >=2 distinct senders EXCEPT the dedicated single-source
+#    case, so each test isolates one guard at a time rather than failing
+#    for two overlapping reasons at once.
 # ---------------------------------------------------------------------------
 _e = _epoch(11)
-_add(_e, "RNEG-IN", "RNEG", 5000.0)
+_add(_e, "RNEG-IN1", "RNEG", 2500.0)
+_add(_e, "RNEG-IN2", "RNEG", 2500.0)
 _add(_e + pd.Timedelta(days=1), "RNEG", "RNEG-OUT", 2000.0)  # ratio 0.40 < 0.80
 
 _e = _epoch(12)
-_add(_e, "RBOUND-IN", "RBOUND", 1000.0)  # exactly at the materiality floor
+_add(_e, "RBOUND-IN1", "RBOUND", 500.0)
+_add(_e, "RBOUND-IN2", "RBOUND", 500.0)  # 2 sources == RAPID_MOVEMENT_MIN_SOURCES, inbound == floor exactly
 _add(_e + pd.Timedelta(days=1), "RBOUND", "RBOUND-OUT", 800.0)  # ratio exactly 0.80
 
 _e = _epoch(13)
-_add(_e, "RFLOOR-IN", "RFLOOR", 999.99)  # just under the $1,000 floor
+_add(_e, "RFLOOR-IN1", "RFLOOR", 500.00)
+_add(_e, "RFLOOR-IN2", "RFLOOR", 499.99)  # inbound totals $999.99, just under the $1,000 floor
 _add(_e + pd.Timedelta(days=1), "RFLOOR", "RFLOOR-OUT", 999.99)  # ratio 1.00 but immaterial
+
+_e = _epoch(14)
+_add(_e, "RSINGLE-IN", "RSINGLE", 5000.0)  # a single counterparty — routine two-party settlement
+_add(_e + pd.Timedelta(days=1), "RSINGLE", "RSINGLE-OUT", 4500.0)  # ratio 0.90, amount material — only 1 source
 
 FIXTURE_COLUMNS = [
     "txn_id", "ts", "from_account", "to_account", "amount",
