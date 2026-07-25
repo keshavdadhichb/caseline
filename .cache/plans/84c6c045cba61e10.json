@@ -14,7 +14,7 @@
       "params": {
         "window_days": 30
       },
-      "reason": "Scope the dataset to the last 30 days of transactions before running any detection."
+      "reason": "Scope the dataset to the last 30 days of transactions before running any detection logic."
     },
     {
       "tool": "feature_engine",
@@ -22,13 +22,14 @@
         "features": [
           "7d_txn_count",
           "30d_txn_count",
+          "7d_txn_sum",
           "30d_txn_sum",
-          "amount_zscore",
           "pct_near_10k_threshold",
+          "amount_zscore",
           "velocity"
         ]
       },
-      "reason": "Compute per-account rolling features \u2014 especially % of transactions near the $10,000 threshold and velocity \u2014 which are required inputs for the structuring rule in the rules_engine."
+      "reason": "Compute per-account rolling features \u2014 especially % of transactions near the $10,000 threshold \u2014 which are required inputs for the rules engine to detect structuring."
     },
     {
       "tool": "rules_engine",
@@ -37,32 +38,30 @@
           "structuring"
         ]
       },
-      "reason": "Apply the named structuring rule to flag accounts with repeated transactions just below the $10,000 reporting threshold."
+      "reason": "Apply the structuring rule: flag accounts with multiple transactions just below the $10,000 reporting threshold within the 30-day window."
     },
     {
       "tool": "risk_scorer",
       "params": {
-        "weights": {
-          "rule_hits": 0.7,
-          "anomaly_score": 0.0,
-          "graph_findings": 0.0
-        }
+        "inputs": [
+          "rules_engine"
+        ]
       },
-      "reason": "Produce a weighted LOW/MEDIUM/HIGH risk rating for each flagged account based on rule hits, so analysts can prioritize their review."
+      "reason": "Translate rule hits into a weighted LOW/MEDIUM/HIGH risk level for each flagged account, enabling prioritization for review."
     }
   ],
   "skipped": [
     {
       "tool": "profile_data",
-      "reason": "This is a targeted structuring detection query, not a broad overview \u2014 EDA profiling adds no value here."
+      "reason": "This is a targeted typology query, not a broad overview \u2014 EDA summary adds no value here."
     },
     {
       "tool": "anomaly_model",
-      "reason": "The query is narrowly scoped to a specific typology (structuring) that is fully addressed by the rules_engine. The anomaly model adds nothing to a pure rule-based threshold question."
+      "reason": "Structuring is a well-defined rule-based typology; the anomaly model is not needed for this narrowly-scoped threshold question and would add noise without value."
     },
     {
       "tool": "graph_analysis",
-      "reason": "Structuring is an account-level pattern, not a network/ring pattern. No counterparty or multi-account relationship analysis is needed."
+      "reason": "Structuring detection focuses on single-account transaction patterns below the reporting threshold \u2014 no network or ring analysis is required."
     }
   ],
   "clarification_needed": null

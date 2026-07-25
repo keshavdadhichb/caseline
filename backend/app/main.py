@@ -43,6 +43,9 @@ app.add_middleware(
 #              "results": [...], "cases": [...], "error": str | None}
 TRACES: dict[str, dict] = {}
 
+# case_id -> case dict, populated as runs complete; backs GET /api/case/{id}
+CASES: dict[str, dict] = {}
+
 
 class QueryRequest(BaseModel):
     query: str
@@ -74,8 +77,10 @@ def _execute(trace_id: str, plan: dict) -> None:
         df = load_transactions()
         outcome = run_plan(df, plan, trace["events"])
         trace["results"] = outcome["results"]
-        trace["cases"] = []  # case_builder/sar_drafter wired in next milestone
+        trace["cases"] = outcome["cases"]
         trace["status"] = "done"
+        for case in outcome["cases"]:
+            CASES[case["case_id"]] = case
     except Exception as exc:  # noqa: BLE001 — surface to the client instead of hanging forever
         trace["status"] = "error"
         trace["error"] = str(exc)
@@ -103,4 +108,7 @@ def get_results(trace_id: str) -> dict:
 
 @app.get("/api/case/{case_id}")
 def get_case(case_id: str) -> dict:
-    raise HTTPException(404, "no cases yet — stub")
+    case = CASES.get(case_id)
+    if case is None:
+        raise HTTPException(404, "unknown case_id")
+    return case

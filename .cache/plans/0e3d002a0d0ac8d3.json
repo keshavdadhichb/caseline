@@ -14,17 +14,17 @@
       "params": {
         "max_amount": 9999.99
       },
-      "reason": "Scope the dataset to only transactions under $10,000, which is the core condition of the query."
+      "reason": "Scope the dataset to only transactions under $10,000, as specified by the query."
     },
     {
       "tool": "feature_engine",
       "params": {
         "features": [
-          "txn_count"
-        ],
-        "groupby": "account"
+          "txn_count",
+          "pct_near_10k_threshold"
+        ]
       },
-      "reason": "Compute per-account transaction counts so we can identify accounts with 10+ qualifying transactions."
+      "reason": "Compute per-account transaction counts and threshold-proximity features needed to identify accounts with 10+ sub-$10,000 transactions \u2014 required input for rules_engine."
     },
     {
       "tool": "rules_engine",
@@ -35,7 +35,7 @@
         "min_txn_count": 10,
         "max_txn_amount": 9999.99
       },
-      "reason": "Apply the structuring rule to flag accounts with 10+ transactions under $10,000 \u2014 this directly answers the query."
+      "reason": "Apply the structuring rule to flag accounts with 10 or more transactions under $10,000, directly answering the query."
     },
     {
       "tool": "risk_scorer",
@@ -44,7 +44,7 @@
           "rules_engine"
         ]
       },
-      "reason": "Assign risk levels to flagged accounts so analysts can prioritize review of the results."
+      "reason": "Produce a risk level for each flagged account, since rule hits were generated and are worth reviewing."
     }
   ],
   "skipped": [
@@ -54,11 +54,11 @@
     },
     {
       "tool": "anomaly_model",
-      "reason": "The query is a pure threshold/aggregation question; anomaly scoring against a population baseline is unnecessary and would add noise."
+      "reason": "The query is a precise, rule-answerable threshold aggregation. Anomaly scoring against a population baseline adds nothing to a pure count-based filter."
     },
     {
       "tool": "graph_analysis",
-      "reason": "No network, ring, or counterparty pattern is being investigated \u2014 this is a simple per-account count question."
+      "reason": "The query asks about individual account behavior, not network patterns, rings, or counterparty relationships."
     }
   ],
   "clarification_needed": null
