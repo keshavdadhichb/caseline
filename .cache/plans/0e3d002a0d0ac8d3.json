@@ -1,0 +1,65 @@
+{
+  "intent": "aggregate_threshold",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": []
+  },
+  "typologies": [
+    "structuring"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "max_amount": 9999.99
+      },
+      "reason": "Scope the dataset to only transactions under $10,000, which is the core condition of the query."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "features": [
+          "txn_count"
+        ],
+        "groupby": "account"
+      },
+      "reason": "Compute per-account transaction counts so we can identify accounts with 10+ qualifying transactions."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "structuring"
+        ],
+        "min_txn_count": 10,
+        "max_txn_amount": 9999.99
+      },
+      "reason": "Apply the structuring rule to flag accounts with 10+ transactions under $10,000 \u2014 this directly answers the query."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "inputs": [
+          "rules_engine"
+        ]
+      },
+      "reason": "Assign risk levels to flagged accounts so analysts can prioritize review of the results."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted threshold query, not a broad overview \u2014 EDA summary adds no value here."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "The query is a pure threshold/aggregation question; anomaly scoring against a population baseline is unnecessary and would add noise."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network, ring, or counterparty pattern is being investigated \u2014 this is a simple per-account count question."
+    }
+  ],
+  "clarification_needed": null
+}

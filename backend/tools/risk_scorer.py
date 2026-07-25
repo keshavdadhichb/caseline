@@ -45,8 +45,13 @@ class RiskRecord:
 def risk_scorer(
     rule_flags: list[Flag],
     graph_flags: list[GraphFlag],
-    scored_features: pd.DataFrame,
+    scored_features: pd.DataFrame | None,
 ) -> list[RiskRecord]:
+    """`scored_features` is the anomaly_model output — pass None (not a
+    placeholder DataFrame) when anomaly_model was skipped for this query.
+    A placeholder score would get run through normalize_anomaly_score's
+    population-percentile mapping and could land on a misleadingly
+    high-looking value, fabricating a signal that never actually ran."""
     rules_by_account: dict[str, set[str]] = {}
     for f in rule_flags:
         rules_by_account.setdefault(f.account_id, set()).add(f.typology)
@@ -56,7 +61,7 @@ def risk_scorer(
         for acct in {gf.account_id, *gf.ring_accounts}:
             graph_by_account.setdefault(acct, set()).add(gf.typology)
 
-    if scored_features.empty:
+    if scored_features is None or scored_features.empty:
         anomaly_norm = pd.Series(dtype=float)
     else:
         anomaly_norm = normalize_anomaly_score(

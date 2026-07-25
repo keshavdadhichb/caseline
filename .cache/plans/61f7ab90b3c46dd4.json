@@ -1,0 +1,99 @@
+{
+  "intent": "entity_lookup",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": [
+      "4521"
+    ]
+  },
+  "typologies": [
+    "structuring",
+    "velocity",
+    "rapid_movement",
+    "high_risk_amount"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "accounts": [
+          "4521"
+        ]
+      },
+      "reason": "Scope the dataset to only customer 4521's transactions before any analysis."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "accounts": [
+          "4521"
+        ],
+        "features": [
+          "7d_txn_count",
+          "30d_txn_count",
+          "7d_sum",
+          "30d_sum",
+          "amount_zscore",
+          "velocity",
+          "pct_near_10k",
+          "rapid_in_out_ratio"
+        ]
+      },
+      "reason": "Compute per-account rolling features for customer 4521 \u2014 required as input for both rules_engine and risk_scorer."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "accounts": [
+          "4521"
+        ],
+        "typologies": [
+          "structuring",
+          "velocity",
+          "rapid_movement",
+          "high_risk_amount"
+        ]
+      },
+      "reason": "Run all named typology rules against customer 4521 to detect any rule-based red flags."
+    },
+    {
+      "tool": "anomaly_model",
+      "params": {
+        "accounts": [
+          "4521"
+        ]
+      },
+      "reason": "Broad 'is this customer suspicious?' question warrants an anomaly score to catch patterns that rules alone might miss."
+    },
+    {
+      "tool": "graph_analysis",
+      "params": {
+        "accounts": [
+          "4521"
+        ],
+        "checks": [
+          "fan_in_ring",
+          "short_cycle"
+        ]
+      },
+      "reason": "Investigating a specific entity's suspiciousness warrants checking their counterparty network for ring or rapid-cycle patterns."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "accounts": [
+          "4521"
+        ]
+      },
+      "reason": "Combine rule hits, anomaly score, and graph findings into a final weighted LOW/MEDIUM/HIGH risk rating for customer 4521."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted single-entity query, not a broad overview \u2014 profile_data is only needed for population-wide EDA summaries."
+    }
+  ],
+  "clarification_needed": null
+}

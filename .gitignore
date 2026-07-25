@@ -11,7 +11,11 @@ data/raw/
 *.zip
 
 # --- Caches / runtime ---
-.cache/
+# .cache/plans/ is INTENTIONALLY NOT ignored — pre-warmed planner responses
+# are committed so the demo works offline (CLAUDE.md "Resilience & demo
+# insurance"). Ignore everything else under .cache/.
+.cache/*
+!.cache/plans/
 __pycache__/
 *.pyc
 .pytest_cache/
