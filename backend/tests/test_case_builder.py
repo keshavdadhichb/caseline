@@ -35,7 +35,7 @@ def test_case_builder_ring_aggregator_has_full_evidence():
     assert case.case_id == "CASE-4521"
     assert case.risk_level == "HIGH"
     assert case.recommended_action == "report"
-    assert {"STRUCTURING", "RAPID_MOVEMENT", "FAN_IN_RING"} <= set(case.typologies)
+    assert {"STRUCTURING_HIGH", "RAPID_MOVEMENT", "FAN_IN_RING"} <= set(case.typologies)
     assert case.ring is not None
     assert len(case.ring["nodes"]) == 10  # 4521 + 9 mules
     assert case.timeline, "expected a non-empty timeline"

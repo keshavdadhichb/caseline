@@ -6,7 +6,7 @@ threshold — that keeps this a pure, fast, hand-checkable unit test of the
 tiering logic itself, independent of the live dataset.
 
 Tier rule under test (see risk_scorer.py's module docstring):
-  HIGH   = rule AND (graph OR anomaly-high)   — two independent methods agree
+  HIGH   = a strong rule fired AND corroborated by a second detection method (graph or anomaly-high)
   MEDIUM = exactly one of {rule, graph}
   LOW    = anomaly-high alone
 """
@@ -64,7 +64,7 @@ def test_graph_alone_is_medium():
 
 def test_multiple_distinct_rules_alone_is_still_medium_not_high():
     """Three rule typologies firing on the same account is still just ONE
-    detection method (rules) — not "two independent signals agreeing"."""
+    detection method (rules) — a rule alone is not corroborated by a second one."""
     records = risk_scorer(
         [_rule_flag("A", "STRUCTURING"), _rule_flag("A", "VELOCITY"), _rule_flag("A", "RAPID_MOVEMENT")], [], None
     )
@@ -150,3 +150,20 @@ def test_formula_weights_still_drive_the_ranking_score():
 def test_records_include_anomaly_component_for_ranking_even_at_low_tier():
     rec = risk_scorer([], [], _scored("K", 1.0))[0]
     assert rec.score == pytest.approx(round(WEIGHT_ANOMALY * 1.0, 3))
+
+
+def test_weak_rule_alone_never_reaches_high_even_with_corroboration():
+    """STRUCTURING_MEDIUM is a WEAK indicator (see risk_scorer.py) — it
+    can hold MEDIUM, but corroboration (graph or high anomaly) must not
+    promote it to HIGH the way a strong rule's corroboration does."""
+    with_graph = risk_scorer([_rule_flag("L", "STRUCTURING_MEDIUM")], [_graph_flag("L")], None)[0]
+    assert with_graph.risk_level == "MEDIUM"
+
+    with_anomaly = risk_scorer([_rule_flag("M", "STRUCTURING_MEDIUM")], [], _scored("M", 1.0))[0]
+    assert with_anomaly.risk_level == "MEDIUM"
+
+
+def test_weak_rule_scores_lower_than_strong_rule_for_ranking():
+    strong = risk_scorer([_rule_flag("N", "VELOCITY")], [], None)[0]
+    weak = risk_scorer([_rule_flag("O", "STRUCTURING_MEDIUM")], [], None)[0]
+    assert weak.score < strong.score

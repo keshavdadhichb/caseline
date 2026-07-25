@@ -51,36 +51,37 @@ def _flags_by_account(flags):
 def test_injected_ring_aggregator_flagged_structuring_and_rapid_movement():
     by_account = _flags_by_account(_run_all_rules())
     assert "4521" in by_account, "aggregator account 4521 was not flagged at all"
-    assert "STRUCTURING" in by_account["4521"], (
-        "aggregator receives sub-threshold deposits within 7 days and consolidates most out — must trip STRUCTURING"
+    assert "STRUCTURING_HIGH" in by_account["4521"], (
+        "aggregator receives sub-threshold deposits within 7 days and consolidates most out — must trip STRUCTURING_HIGH"
     )
     assert "RAPID_MOVEMENT" in by_account["4521"], (
         "aggregator moves ~85% of inbound funds out within 48h from 9 distinct senders — must trip RAPID_MOVEMENT"
     )
 
 
-def test_injected_ring_mules_no_longer_flagged_individually_by_structuring():
-    """Documented consequence of scoping STRUCTURING to receiver-side +
-    consolidation only — see module docstring. The mules are still
-    surfaced via FAN_IN_RING's ring subgraph (test_hybrid.py), just not by
-    this rule on their own anymore."""
+def test_injected_ring_mules_flagged_by_the_weaker_medium_tier_only():
+    """Mules only ever SEND 3 sub-threshold deposits each and never
+    consolidate — they don't satisfy STRUCTURING_HIGH's consolidation leg,
+    but DO satisfy STRUCTURING_MEDIUM's original, looser definition (3+ in
+    a 10% band, sender or receiver, no consolidation). This is the point
+    of the two-tier design: a weaker but real indicator still surfaces."""
     by_account = _flags_by_account(_run_all_rules())
     for i in range(1, 10):
         mule = f"RING-M{i:02d}"
-        assert "STRUCTURING" not in by_account.get(mule, set()), (
-            f"{mule} unexpectedly flagged STRUCTURING — it only sends, never consolidates"
-        )
+        assert "STRUCTURING_MEDIUM" in by_account.get(mule, set()), f"{mule} should trip the weaker tier"
+        assert "STRUCTURING_HIGH" not in by_account.get(mule, set()), f"{mule} never consolidates — must not be HIGH"
 
 
-def test_only_the_synthetic_ring_trips_structuring_on_this_dataset():
+def test_only_the_synthetic_ring_trips_structuring_high_on_this_dataset():
     """Honest, disclosed finding, not silently hidden: after tightening,
     no REAL (non-synthetic) account in the current 200k-row sample
-    satisfies STRUCTURING's count+band+window+consolidation bar. This is
-    a real precision/recall tradeoff of this specific rule change on this
-    specific dataset — see METHODOLOGY.md."""
+    satisfies STRUCTURING_HIGH's count+band+window+consolidation bar —
+    only the injected ring's aggregator does. STRUCTURING_MEDIUM (the
+    weaker, original tier) does fire on real accounts too — see
+    METHODOLOGY.md."""
     by_account = _flags_by_account(_run_all_rules())
-    structuring_accounts = {acct for acct, typs in by_account.items() if "STRUCTURING" in typs}
-    assert structuring_accounts == {"4521"}
+    high_accounts = {acct for acct, typs in by_account.items() if "STRUCTURING_HIGH" in typs}
+    assert high_accounts == {"4521"}
 
 
 def test_flags_are_a_small_minority_of_accounts():

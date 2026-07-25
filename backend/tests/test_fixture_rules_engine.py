@@ -28,8 +28,18 @@ def _by_account_typology():
 BY_ACCOUNT = _by_account_typology()
 
 EXPECTED = {
-    "STRUCT-POS": {"STRUCTURING"},
-    "STRUCT-BOUND": {"STRUCTURING"},
+    # STRUCTURING_MEDIUM (3+ in a 10% band, sender-or-receiver, no
+    # consolidation) is the original rule, kept as a weaker tier — it
+    # fires on both the receiver (STRUCT-POS/BOUND) and the shared "-IN"
+    # sender behind them, and even on the no-consolidation negative case
+    # (that account's whole point: it satisfies the WEAK definition, just
+    # not the strict HIGH one requiring confirmed consolidation).
+    "STRUCT-POS": {"STRUCTURING_HIGH", "STRUCTURING_MEDIUM"},
+    "STRUCT-POS-IN": {"STRUCTURING_MEDIUM"},
+    "STRUCT-BOUND": {"STRUCTURING_HIGH", "STRUCTURING_MEDIUM"},
+    "STRUCT-BOUND-IN": {"STRUCTURING_MEDIUM"},
+    "STRUCT-NEG-NOCONSOL": {"STRUCTURING_MEDIUM"},
+    "STRUCT-NEG-NOCONSOL-IN": {"STRUCTURING_MEDIUM"},
     "FANIN-AGG": {"RAPID_MOVEMENT"},  # FAN_IN_RING itself comes from graph_analysis, not rules
     "RBOUND": {"RAPID_MOVEMENT"},
     # RSINGLE deliberately absent: amount+ratio would qualify, but it's a
@@ -52,7 +62,7 @@ def test_exact_flagged_set_across_entire_fixture():
 #     within 7 days, AND >=60% consolidated back out within 7 more days) --
 
 def test_structuring_positive_full_cluster_and_consolidation():
-    flag = next(f for f in FLAGS if f.account_id == "STRUCT-POS")
+    flag = next(f for f in FLAGS if f.account_id == "STRUCT-POS" and f.typology == "STRUCTURING_HIGH")
     assert flag.evidence["count"] == 5
     assert flag.evidence["consolidation_ratio"] == 0.65  # exactly the 65% sent out, per fixtures.py
     assert set(flag.evidence["amounts"]) == {9600, 9650, 9700, 9750, 9800}
@@ -60,8 +70,12 @@ def test_structuring_positive_full_cluster_and_consolidation():
 
 def test_structuring_negative_qualifying_cluster_but_no_consolidation():
     """The user's own contrasting case: a legitimate business makes
-    frequent sub-threshold deposits but leaves the funds in place."""
-    assert "STRUCT-NEG-NOCONSOL" not in BY_ACCOUNT
+    frequent sub-threshold deposits but leaves the funds in place. Weaker
+    tier still fires (a real indicator worth review), strict tier does not
+    (no confirmed consolidation)."""
+    typologies = BY_ACCOUNT.get("STRUCT-NEG-NOCONSOL", set())
+    assert "STRUCTURING_MEDIUM" in typologies
+    assert "STRUCTURING_HIGH" not in typologies
 
 
 def test_structuring_negative_spread_over_40_days_not_flagged():
@@ -69,7 +83,7 @@ def test_structuring_negative_spread_over_40_days_not_flagged():
 
 
 def test_structuring_boundary_exact_count_band_and_consolidation():
-    flag = next(f for f in FLAGS if f.account_id == "STRUCT-BOUND")
+    flag = next(f for f in FLAGS if f.account_id == "STRUCT-BOUND" and f.typology == "STRUCTURING_HIGH")
     assert flag.evidence["count"] == 5
     assert all(a == 9500.00 for a in flag.evidence["amounts"])
     assert flag.evidence["consolidation_ratio"] == 0.60
@@ -177,4 +191,4 @@ def test_clean_accounts_produce_zero_flags():
 def test_typologies_filter_still_returns_only_requested_rule_on_fixture():
     flags = rules_engine(DF, FEATURES, typologies=["structuring"])
     assert flags, "expected structuring flags on the fixture"
-    assert all(f.typology == "STRUCTURING" for f in flags)
+    assert all(f.typology in ("STRUCTURING_HIGH", "STRUCTURING_MEDIUM") for f in flags)

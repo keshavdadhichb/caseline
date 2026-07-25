@@ -1,26 +1,37 @@
 """risk_scorer — combines rule hits + anomaly score + graph findings into
-LOW/MEDIUM/HIGH via CORROBORATION between independent detection methods,
-plus a weighted, printed score used for ranking within and across tiers.
+LOW/MEDIUM/HIGH via corroboration between detection methods, plus a
+weighted, printed score used for ranking within and across tiers.
 
 Tier assignment is corroboration-based, not a single blended number
 crossing a cutoff: a single detection method — even a confident one —
-produced too many single-signal HIGH flags to be a credible "report this"
-tier (see METHODOLOGY.md for the before/after numbers). The three
-methods (rules, graph, anomaly model) fail in different, largely
-independent ways, so two of them agreeing is real evidence in a way that
-one strong signal alone is not:
+produced too many single-method HIGH flags to be a credible "report this"
+tier (see METHODOLOGY.md). Rules, graph, and the anomaly model fail in
+different ways, so a rule being corroborated by a second detection method
+is real evidence in a way one signal alone is not — though rules and the
+anomaly model share several underlying features (near_threshold_count,
+rapid_inout_ratio, std_amount feed both), so a rule+anomaly agreement is
+weaker corroboration than rule+graph, which uses genuinely separate data.
+See METHODOLOGY.md for the measured breakdown.
 
-  HIGH   — a named rule fired AND at least one of (graph finding, anomaly
-           score in the population's own top tier). Two independent
-           detection methods agreeing.
-  MEDIUM — exactly one detection method fired: a rule alone, or a graph
-           finding alone (with no rule).
+Not every rule counts equally toward HIGH. STRUCTURING_MEDIUM (and any
+other future "weaker indicator" typology) is a real, named AML red flag
+worth review, but on its own is closer to what ordinary legitimate
+activity can also produce — compliance teams route strong/definite-match
+indicators differently from weak/possible-match ones. So:
+
+  HIGH   — a STRONG rule fired AND corroborated by a second detection
+           method (a graph finding, or an anomaly score in the
+           population's own top tier).
+  MEDIUM — exactly one detection method fired (any rule alone — strong or
+           weak — or a graph finding alone), OR a strong rule with only
+           weak-rule company.
   LOW    — anomaly score alone, with no rule and no graph corroboration.
 
 `score` (the old weighted formula) is kept for ranking — "the top 50
 accounts by risk score" (used for Precision@N in evals/baseline.py) needs
-a continuous ordering, and tier alone can't rank within a 1000-account
-MEDIUM bucket. It no longer determines risk_level.
+a continuous ordering, and tier alone can't rank within a large MEDIUM
+bucket. It no longer determines risk_level; weak rules contribute less to
+it than strong ones (WEAK_RULE_WEIGHT < 1.0).
 """
 
 from __future__ import annotations
@@ -40,11 +51,17 @@ FORMULA = (
     f"risk_score (ranking only) = {WEIGHT_RULES:.2f} x rules_component "
     f"+ {WEIGHT_GRAPH:.2f} x graph_component "
     f"+ {WEIGHT_ANOMALY:.2f} x anomaly_component; "
-    "risk_level (tier) = HIGH if rule AND (graph OR anomaly-high), "
-    "MEDIUM if exactly one of {rule, graph}, LOW if anomaly-high alone"
+    "risk_level (tier) = HIGH if a STRONG rule fired AND corroborated by a second "
+    "detection method (graph or anomaly-high), MEDIUM if exactly one method fired "
+    "(or only weak rules), LOW if anomaly-high alone"
 )
 
-RULES_SATURATION_COUNT = 2  # >=2 distinct rule typologies -> rules_component maxes at 1.0
+# Weak = a real but lower-confidence indicator (see module docstring) that
+# can keep an account on MEDIUM but never promotes it to HIGH by itself.
+WEAK_RULE_TYPOLOGIES = {"STRUCTURING_MEDIUM"}
+WEAK_RULE_WEIGHT = 0.5  # a weak rule's contribution to the ranking score, vs 1.0 for a strong one
+
+RULES_SATURATION_COUNT = 2  # >=2 strong-rule-equivalent units -> rules_component maxes at 1.0
 
 
 @dataclass
@@ -97,17 +114,20 @@ def risk_scorer(
         a_component = float(anomaly_norm.get(account_id, 0.0))
         a_is_high = account_id in high_anomaly_accounts
 
+        strong_rules = [t for t in rules_fired if t not in WEAK_RULE_TYPOLOGIES]
+        has_strong_rule = bool(strong_rules)
         has_rule = bool(rules_fired)
         has_graph = bool(graph_fired)
 
-        if has_rule and (has_graph or a_is_high):
+        if has_strong_rule and (has_graph or a_is_high):
             risk_level = "HIGH"
         elif has_rule or has_graph:
             risk_level = "MEDIUM"
         else:
             risk_level = "LOW"  # a_is_high alone — the only other way to be a candidate at all
 
-        rules_component = min(1.0, len(rules_fired) / RULES_SATURATION_COUNT)
+        weighted_rule_units = sum(1.0 if t not in WEAK_RULE_TYPOLOGIES else WEAK_RULE_WEIGHT for t in rules_fired)
+        rules_component = min(1.0, weighted_rule_units / RULES_SATURATION_COUNT)
         graph_component = 1.0 if graph_fired else 0.0
         score = (
             WEIGHT_RULES * rules_component

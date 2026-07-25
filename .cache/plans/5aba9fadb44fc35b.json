@@ -3,15 +3,10 @@
   "filters": {
     "window_days": null,
     "min_amount": null,
-    "accounts": null
+    "accounts": []
   },
-  "typologies": [
-    "structuring",
-    "velocity",
-    "rapid_movement",
-    "high_risk_amount"
-  ],
+  "typologies": [],
   "steps": [],
   "skipped": [],
-  "clarification_needed": "Can you narrow down what you're looking for \u2014 e.g., a specific account, time window, transaction amount threshold, or typology (structuring, velocity, rapid movement, high-risk amounts)?"
+  "clarification_needed": "Can you clarify what you're looking for \u2014 a specific account or set of accounts, a time window, a minimum transaction amount, or a particular typology (e.g. structuring, velocity, rapid movement, high-risk amounts)?"
 }
