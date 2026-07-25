@@ -199,17 +199,17 @@ def _fallback_plan(reason: str) -> dict:
 
 
 def _call_llm(query: str) -> dict:
-    client = anthropic.Anthropic()
-    # The SDK's own default read timeout is 600s — nothing in the plain
-    # `elapsed > LIVE_TIMEOUT_SECONDS` check below actually bounds how long
-    # a slow/degraded connection can block this call (that check only fires
-    # AFTER the call already returned). A hung or crawling request during
-    # the demo — degraded venue wifi is a real scenario, more likely than
-    # a clean network failure — would block submit_query's POST handler
-    # for up to 10 minutes with nothing to show. Pass an explicit timeout
-    # so a slow call actually raises near the documented 8s budget and
-    # falls through to the disk cache, instead of just being logged as
-    # "slow" after the fact.
+    # The SDK's own default read timeout is 600s, and it retries transient
+    # failures (including timeouts) up to `max_retries` times — the SDK's
+    # own default is 2, so a per-call `timeout=` alone caps a single
+    # attempt but not the total wait (measured live: ~25s, close to
+    # 3x the 8s budget, before this fix). Both defaults have to be
+    # overridden together to make LIVE_TIMEOUT_SECONDS the actual ceiling
+    # on how long submit_query's synchronous POST handler can block —
+    # a hung or crawling connection (degraded venue wifi is a more likely
+    # demo failure than clean wifi-off) would otherwise leave the trace
+    # panel showing nothing for far longer than the documented budget.
+    client = anthropic.Anthropic(max_retries=0)
     response = client.messages.create(
         model=MODEL,
         max_tokens=2048,

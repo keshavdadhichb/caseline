@@ -10,32 +10,32 @@
   "skipped": [
     {
       "tool": "filter_data",
-      "reason": "No scoping criteria provided in the query."
+      "reason": "No valid AML query was provided to scope."
     },
     {
       "tool": "profile_data",
-      "reason": "No legitimate analytical query was provided."
+      "reason": "No valid AML query was provided to profile."
     },
     {
       "tool": "feature_engine",
-      "reason": "No legitimate analytical query was provided."
+      "reason": "No valid AML query was provided to compute features for."
     },
     {
       "tool": "rules_engine",
-      "reason": "No legitimate analytical query was provided."
+      "reason": "No valid AML query was provided to evaluate rules against."
     },
     {
       "tool": "anomaly_model",
-      "reason": "No legitimate analytical query was provided."
+      "reason": "No valid AML query was provided to score anomalies for."
     },
     {
       "tool": "graph_analysis",
-      "reason": "No legitimate analytical query was provided."
+      "reason": "No valid AML query was provided to analyse a network for."
     },
     {
       "tool": "risk_scorer",
-      "reason": "No legitimate analytical query was provided."
+      "reason": "No valid AML query was provided to produce risk scores for."
     }
   ],
-  "clarification_needed": "Your input appears to be a prompt-injection attempt rather than a compliance question. Please provide a legitimate AML analysis query (e.g., \"Which accounts show structuring behavior in the last 30 days?\")."
+  "clarification_needed": "Your message appears to be a prompt-injection attempt rather than a genuine AML compliance query. Please provide a legitimate question about transaction monitoring, suspicious activity, or account risk."
 }

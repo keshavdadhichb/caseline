@@ -18,11 +18,11 @@
     },
     {
       "tool": "feature_engine",
-      "reason": "No valid AML query to engineer features for \u2014 input was a SQL injection attempt."
+      "reason": "No valid AML query to compute features for \u2014 input was a SQL injection attempt."
     },
     {
       "tool": "rules_engine",
-      "reason": "No valid AML query to evaluate rules for \u2014 input was a SQL injection attempt."
+      "reason": "No valid AML query to evaluate rules against \u2014 input was a SQL injection attempt."
     },
     {
       "tool": "anomaly_model",
@@ -34,8 +34,8 @@
     },
     {
       "tool": "risk_scorer",
-      "reason": "No valid AML query to score risk for \u2014 input was a SQL injection attempt."
+      "reason": "No valid AML query to produce a risk score for \u2014 input was a SQL injection attempt."
     }
   ],
-  "clarification_needed": "Your input appears to be a SQL injection attempt rather than an AML compliance question. Could you please provide a legitimate query about transactions, accounts, or suspicious activity?"
+  "clarification_needed": "Your input appears to be a SQL injection attack rather than a compliance question. Could you please provide a legitimate AML investigation query?"
 }
