@@ -1,0 +1,12 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": []
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [],
+  "clarification_needed": "What should I focus on \u2014 a specific account, time window, amount threshold, or typology (e.g. structuring, velocity, rapid movement, high-risk amounts)?"
+}

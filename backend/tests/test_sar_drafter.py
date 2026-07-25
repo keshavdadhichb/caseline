@@ -31,7 +31,10 @@ def _sample_case() -> CaseFile:
     )
 
 
-def test_template_fallback_used_when_live_call_fails(monkeypatch):
+def test_template_fallback_used_when_live_call_fails(monkeypatch, tmp_path):
+    # point the disk cache at an empty dir so the fallback path is the
+    # template, not a narrative cached by a real run
+    monkeypatch.setattr(sar_drafter, "CACHE_DIR", tmp_path)
     monkeypatch.setattr(sar_drafter, "_draft_live", lambda case: (_ for _ in ()).throw(RuntimeError("no network")))
 
     narrative = sar_drafter.draft_sar(_sample_case())
@@ -40,6 +43,23 @@ def test_template_fallback_used_when_live_call_fails(monkeypatch):
     assert "HIGH" in narrative
     assert "report" in narrative
     assert "template" in narrative.lower(), "fallback must disclose it's a template, not a live draft"
+
+
+def test_disk_cache_replays_when_live_call_fails(monkeypatch, tmp_path):
+    """A previously-drafted narrative on disk is replayed on later failure —
+    this is what makes the flagship ring SAR survive a wifi-off demo."""
+    monkeypatch.setattr(sar_drafter, "CACHE_DIR", tmp_path)
+    case = _sample_case()
+
+    # first call succeeds and writes to cache
+    monkeypatch.setattr(sar_drafter, "_draft_live", lambda c: "LIVE NARRATIVE FOR 4521")
+    first = sar_drafter.draft_sar(case)
+    assert first == "LIVE NARRATIVE FOR 4521"
+
+    # later call fails — must replay the cached narrative, not the template
+    monkeypatch.setattr(sar_drafter, "_draft_live", lambda c: (_ for _ in ()).throw(RuntimeError("offline")))
+    second = sar_drafter.draft_sar(case)
+    assert second == "LIVE NARRATIVE FOR 4521"
 
 
 def test_template_fallback_cites_only_amounts_present_in_evidence():

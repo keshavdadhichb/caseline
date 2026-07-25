@@ -4,7 +4,7 @@
     "window_days": null,
     "min_amount": null,
     "accounts": [
-      "4521"
+      "RING-M01"
     ]
   },
   "typologies": [
@@ -18,16 +18,16 @@
       "tool": "filter_data",
       "params": {
         "accounts": [
-          "4521"
+          "RING-M01"
         ]
       },
-      "reason": "Scope all data to customer 4521 before any analysis."
+      "reason": "Scope the dataset to only transactions involving account RING-M01 before any analysis."
     },
     {
       "tool": "feature_engine",
       "params": {
         "accounts": [
-          "4521"
+          "RING-M01"
         ],
         "features": [
           "7d_txn_count",
@@ -40,13 +40,13 @@
           "rapid_in_out_ratio"
         ]
       },
-      "reason": "Compute per-account rolling features for customer 4521 \u2014 required by both rules_engine and risk_scorer."
+      "reason": "Compute per-account rolling features for RING-M01 to feed into the rules engine and risk scorer."
     },
     {
       "tool": "rules_engine",
       "params": {
         "accounts": [
-          "4521"
+          "RING-M01"
         ],
         "typologies": [
           "structuring",
@@ -55,40 +55,44 @@
           "high_risk_amount"
         ]
       },
-      "reason": "Run all named typology rules against customer 4521 to detect any rule-based flags."
-    },
-    {
-      "tool": "anomaly_model",
-      "params": {
-        "accounts": [
-          "4521"
-        ]
-      },
-      "reason": "Score customer 4521 against the full population baseline to catch anything the rules might miss \u2014 appropriate for a broad 'is this account suspicious?' query."
+      "reason": "Run all named typology rules against RING-M01's features to surface any rule-based red flags."
     },
     {
       "tool": "graph_analysis",
       "params": {
         "accounts": [
-          "4521"
+          "RING-M01"
+        ],
+        "checks": [
+          "fan_in_ring",
+          "short_cycle"
         ]
       },
-      "reason": "Investigate customer 4521's counterparties for ring or fan-in patterns, since a general suspicion query warrants checking network-level behavior."
+      "reason": "The account name prefix 'RING' strongly suggests a network/ring pattern of interest; graph analysis will detect fan-in rings and short cycles involving RING-M01 and its counterparties."
+    },
+    {
+      "tool": "anomaly_model",
+      "params": {
+        "accounts": [
+          "RING-M01"
+        ]
+      },
+      "reason": "Score RING-M01 against the full population baseline to catch any anomalies that rule-based checks might miss on a single-entity investigation."
     },
     {
       "tool": "risk_scorer",
       "params": {
         "accounts": [
-          "4521"
+          "RING-M01"
         ]
       },
-      "reason": "Combine rule hits, anomaly score, and graph findings into a final LOW/MEDIUM/HIGH risk rating for customer 4521."
+      "reason": "Combine rule hits, anomaly score, and graph findings into a final weighted risk level for RING-M01."
     }
   ],
   "skipped": [
     {
       "tool": "profile_data",
-      "reason": "profile_data is for broad/overview queries across the full dataset. This query targets a single specific account, so a population-level EDA summary adds no value."
+      "reason": "This is a targeted single-entity query, not a broad overview. Profile data is only needed for wide population-level EDA."
     }
   ],
   "clarification_needed": null

@@ -24,7 +24,7 @@
           "pct_near_10k_threshold"
         ]
       },
-      "reason": "Compute per-account transaction counts and threshold-proximity features needed to identify accounts with 10+ sub-$10,000 transactions \u2014 required input for rules_engine."
+      "reason": "Compute per-account transaction counts and threshold-proximity features needed to identify accounts with 10+ qualifying transactions."
     },
     {
       "tool": "rules_engine",
@@ -35,7 +35,7 @@
         "min_txn_count": 10,
         "max_txn_amount": 9999.99
       },
-      "reason": "Apply the structuring rule to flag accounts with 10 or more transactions under $10,000, directly answering the query."
+      "reason": "Apply the structuring rule to flag accounts with 10 or more transactions under $10,000 \u2014 directly answers the query."
     },
     {
       "tool": "risk_scorer",
@@ -44,7 +44,7 @@
           "rules_engine"
         ]
       },
-      "reason": "Produce a risk level for each flagged account, since rule hits were generated and are worth reviewing."
+      "reason": "Assign LOW/MEDIUM/HIGH risk levels to flagged accounts based on rule hits, so analysts can prioritize review."
     }
   ],
   "skipped": [
@@ -54,11 +54,11 @@
     },
     {
       "tool": "anomaly_model",
-      "reason": "The query is a precise, rule-answerable threshold aggregation. Anomaly scoring against a population baseline adds nothing to a pure count-based filter."
+      "reason": "The query is a pure threshold/count aggregation. The anomaly model adds nothing to a narrowly-scoped rule question like this."
     },
     {
       "tool": "graph_analysis",
-      "reason": "The query asks about individual account behavior, not network patterns, rings, or counterparty relationships."
+      "reason": "No network, ring, or counterparty pattern is being investigated \u2014 this is a single-account threshold question."
     }
   ],
   "clarification_needed": null

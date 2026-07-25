@@ -4,10 +4,17 @@ a recommended escalation action. No LLM here — a case file is a direct,
 inspectable assembly of what the rules/graph/model already found; only the
 SAR narrative (sar_drafter) touches the LLM, and only after the case file
 already contains every fact it's allowed to reference.
+
+`build_indexes` pre-groups transactions and flags by account ONCE so
+`case_builder` is O(that account's activity), not O(whole dataset). A broad
+query can score 15k+ accounts; without the index each case did a full-frame
+scan and the batch took minutes (150k rows x 15k cases). The executor also
+caps how many full case files it builds — see CASE_BUILD_LIMIT there.
 """
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 
 import pandas as pd
@@ -35,18 +42,40 @@ class CaseFile:
     narrative: str | None = None  # filled in by sar_drafter, HIGH cases only
 
 
-def case_builder(
-    record: RiskRecord,
-    rule_flags: list[Flag],
-    graph_flags: list[GraphFlag],
-    df: pd.DataFrame,
-) -> CaseFile:
+@dataclass
+class CaseIndexes:
+    """Per-account lookups built once per query so each case file is cheap."""
+    txn_rows: dict[str, list[int]]
+    rule_flags: dict[str, list[Flag]]
+    graph_flags: dict[str, list[GraphFlag]]
+
+
+def build_indexes(
+    df: pd.DataFrame, rule_flags: list[Flag], graph_flags: list[GraphFlag]
+) -> CaseIndexes:
+    txn_rows: dict[str, list[int]] = defaultdict(list)
+    for pos, (frm, to) in enumerate(zip(df["from_account"].values, df["to_account"].values)):
+        txn_rows[frm].append(pos)
+        if to != frm:
+            txn_rows[to].append(pos)
+
+    rules_by_account: dict[str, list[Flag]] = defaultdict(list)
+    for f in rule_flags:
+        rules_by_account[f.account_id].append(f)
+
+    graph_by_account: dict[str, list[GraphFlag]] = defaultdict(list)
+    for gf in graph_flags:
+        for acct in {gf.account_id, *gf.ring_accounts}:
+            graph_by_account[acct].append(gf)
+
+    return CaseIndexes(txn_rows, rules_by_account, graph_by_account)
+
+
+def case_builder(record: RiskRecord, df: pd.DataFrame, idx: CaseIndexes) -> CaseFile:
     account_id = record.account_id
 
-    own_rule_flags = [f for f in rule_flags if f.account_id == account_id]
-    own_graph_flags = [
-        gf for gf in graph_flags if gf.account_id == account_id or account_id in gf.ring_accounts
-    ]
+    own_rule_flags = idx.rule_flags.get(account_id, [])
+    own_graph_flags = idx.graph_flags.get(account_id, [])
 
     evidence = (
         [{"typology": f.typology, "source": "rules_engine", **f.evidence} for f in own_rule_flags]
@@ -54,7 +83,7 @@ def case_builder(
     )
     typologies = sorted({e["typology"] for e in evidence})
 
-    own_txns = df[(df.from_account == account_id) | (df.to_account == account_id)]
+    own_txns = df.iloc[idx.txn_rows.get(account_id, [])]
     cited_txn_ids = {tid for f in own_rule_flags for tid in f.txn_ids}
     ranked = own_txns.assign(_cited=own_txns.txn_id.isin(cited_txn_ids))
     ranked = ranked.sort_values(["_cited", "amount"], ascending=[False, False]).head(TIMELINE_MAX_ROWS)

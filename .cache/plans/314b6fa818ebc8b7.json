@@ -1,0 +1,64 @@
+{
+  "intent": "detect_velocity",
+  "filters": {
+    "window_days": 7,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [
+    "velocity"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "window_days": 7
+      },
+      "reason": "Scope the dataset to the most recent 7 days of transactions before running any analysis."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "features": [
+          "7d_txn_count",
+          "7d_txn_sum",
+          "velocity"
+        ]
+      },
+      "reason": "Compute per-account rolling 7-day transaction count, sum, and velocity metrics \u2014 required inputs for the rules engine and risk scorer."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "velocity"
+        ]
+      },
+      "reason": "Apply the named velocity typology rule to flag accounts whose transaction frequency exceeds defined thresholds within the 7-day window."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "inputs": [
+          "rules_engine"
+        ]
+      },
+      "reason": "Translate velocity rule hits into LOW/MEDIUM/HIGH risk levels for prioritized review."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted velocity detection query, not a broad overview \u2014 EDA summary adds no value here."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "The query is narrowly scoped to velocity typology; the rules engine directly covers this without needing a population-wide anomaly model."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network, ring, or counterparty pattern is implied \u2014 this is a single-dimension velocity threshold question."
+    }
+  ],
+  "clarification_needed": null
+}

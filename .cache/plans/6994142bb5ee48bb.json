@@ -1,0 +1,43 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [],
+  "steps": [
+    {
+      "tool": "profile_data",
+      "params": {},
+      "reason": "The query is a broad overview request \u2014 profile_data is purpose-built to produce a high-level EDA summary including transaction count, accounts, date range, volume, and channel breakdown."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No date, amount, or account scoping was requested \u2014 the analyst wants a full-dataset overview, so no filtering is needed."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "Per-account rolling features are not needed for a broad overview summary."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No specific typology or threshold rule is being targeted in this overview query."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "Anomaly scoring is not needed for a general overview \u2014 no suspicious activity detection was requested."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network, ring, or counterparty pattern investigation was requested."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No detection tools are running, so there are no flags to score."
+    }
+  ],
+  "clarification_needed": null
+}

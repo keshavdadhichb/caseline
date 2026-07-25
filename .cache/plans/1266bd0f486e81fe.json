@@ -1,0 +1,64 @@
+{
+  "intent": "detect_rapid_movement",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [
+    "rapid_movement"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "scope": "all_accounts",
+        "channel": "all"
+      },
+      "reason": "Establish the full dataset baseline before computing rapid in->out ratios across all accounts."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "features": [
+          "rapid_in_out_ratio"
+        ],
+        "window_hours": 48
+      },
+      "reason": "Compute per-account rapid in->out ratio within a 48-hour rolling window \u2014 the core metric needed to answer this query."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "rapid_movement"
+        ]
+      },
+      "reason": "Apply the rapid_movement named rule to flag accounts whose 48-hour in->out ratio exceeds the defined threshold."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "inputs": [
+          "rules_engine"
+        ]
+      },
+      "reason": "Rank and score flagged accounts so analysts can prioritize review by LOW/MEDIUM/HIGH risk level."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted typology question, not a broad overview query \u2014 EDA summary adds no value here."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "The rapid_movement rule directly captures the 48-hour in->out behavior; anomaly_model is redundant for this narrowly-scoped, well-defined threshold question."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "The query asks about individual account fund-movement speed, not network rings or counterparty relationships \u2014 graph analysis is not applicable."
+    }
+  ],
+  "clarification_needed": null
+}

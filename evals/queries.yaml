@@ -1,0 +1,70 @@
+# Caseline eval suite. q01-q03 are the 3 canonical queries from the problem
+# statement (verbatim — see HACKATHON.md) and must pass perfectly. The rest
+# cover the other typologies, graph patterns, a broad overview, an explicit
+# date range, a second entity lookup, and two intentionally ambiguous
+# queries that should trigger a clarification instead of a guess.
+#
+# Assertions check tool sets and result-level facts (both reliably
+# checkable) rather than the planner's free-text "intent" label, which the
+# LLM invents per call and isn't schema-constrained to fixed values.
+
+- id: q01
+  query: "Find structuring patterns in the last 30 days"
+  expect_steps_include: [filter_data, feature_engine, rules_engine]
+  expect_skipped_include: [anomaly_model, graph_analysis]
+  expect_result_typology_include: [STRUCTURING]
+
+- id: q02
+  query: "Which customers made 10+ transactions under $10,000?"
+  expect_steps_include: [filter_data, feature_engine, rules_engine]
+  expect_skipped_include: [anomaly_model, graph_analysis]
+  expect_result_typology_include: [STRUCTURING]
+
+- id: q03
+  query: "Is customer ID 4521 suspicious?"
+  expect_filters_accounts_include: ["4521"]
+  expect_steps_include: [filter_data, feature_engine, rules_engine, anomaly_model, graph_analysis]
+  expect_result_account: "4521"
+  expect_result_risk_level: HIGH
+  expect_result_typology_include: [STRUCTURING, RAPID_MOVEMENT, FAN_IN_RING]
+
+- id: q04
+  query: "Show me accounts with unusual transaction velocity in the past week"
+  expect_steps_include: [filter_data, feature_engine, rules_engine]
+
+- id: q05
+  query: "Which accounts move most of their incoming funds out within 48 hours?"
+  expect_steps_include: [filter_data, feature_engine, rules_engine]
+  expect_result_typology_include: [RAPID_MOVEMENT]
+
+- id: q06
+  query: "Are there any rings where several accounts funnel money into one account?"
+  expect_steps_include: [filter_data, graph_analysis]
+  expect_result_typology_include: [FAN_IN_RING]
+
+- id: q07
+  query: "Detect any circular round-tripping transaction patterns"
+  expect_steps_include: [filter_data, graph_analysis]
+
+- id: q08
+  query: "Give me an overview of the transaction data"
+  expect_steps_include: [profile_data]
+
+- id: q09
+  query: "Find structuring activity between September 10 and September 17, 2022"
+  expect_steps_include: [filter_data, rules_engine]
+  expect_result_typology_include: [STRUCTURING]
+
+- id: q10
+  query: "What about account RING-M01 — anything concerning?"
+  expect_filters_accounts_include: ["RING-M01"]
+  expect_result_account: "RING-M01"
+
+- id: q11
+  query: "Is there suspicious activity?"
+  expect_clarification: true
+
+- id: q12
+  query: "Flag transactions that are unusually large for the account involved"
+  expect_steps_include: [filter_data, feature_engine, rules_engine]
+  expect_result_typology_include: [HIGH_RISK_AMOUNT]

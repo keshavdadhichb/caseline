@@ -23,3 +23,4 @@ test:
 
 eval:
 	$(PY) evals/run.py
+	$(PY) evals/baseline.py

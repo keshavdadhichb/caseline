@@ -8,23 +8,19 @@ so execution semantics never depend on the LLM echoing them consistently.
 from __future__ import annotations
 
 import time
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from typing import Any
 
 import pandas as pd
 
 from tools.anomaly_model import anomaly_model
-from tools.case_builder import case_builder
+from tools.case_builder import build_indexes, case_builder
 from tools.feature_engine import feature_engine
 from tools.filter_data import filter_data
 from tools.graph_analysis import graph_analysis
 from tools.profile_data import profile_data
 from tools.risk_scorer import risk_scorer
 from tools.rules_engine import rules_engine
-from tools.sar_drafter import _draft_template, draft_sar
-
-MAX_LIVE_SAR_DRAFTS = 10  # protects an adversarial/broad query from spiraling into minutes of LLM calls
 
 # Dependency-respecting execution order. The planner's JSON lists "steps" in
 # whatever order the LLM happened to emit them — nothing in the schema
@@ -38,6 +34,11 @@ CANONICAL_ORDER = [
     "filter_data", "profile_data", "feature_engine",
     "rules_engine", "anomaly_model", "graph_analysis", "risk_scorer",
 ]
+
+# Max full case files built per query. risk_records is sorted by score, so
+# this is the top-N most suspicious accounts — an analyst never reviews more,
+# and every scored account still appears in the lightweight results list.
+CASE_BUILD_LIMIT = 300
 
 
 def run_plan(df: pd.DataFrame, plan: dict, events: list[dict]) -> dict:
@@ -81,44 +82,27 @@ def run_plan(df: pd.DataFrame, plan: dict, events: list[dict]) -> dict:
 
     risk_records = state["risk_records"]
 
-    # Finalization is automatic, not a planned/skippable step — every scored
-    # account gets a case file, and only HIGH-risk cases (the "report"
-    # escalation tier) get an LLM-drafted SAR narrative. It still gets its
-    # own trace events so the panel keeps showing progress instead of going
-    # quiet for the ~15-20s a batch of live drafts can take.
+    # Finalization: assemble case files for the highest-risk accounts. Two
+    # bounds keep this fast regardless of how broad the query is:
+    #   1. Only the top CASE_BUILD_LIMIT accounts by score get a full case
+    #      file (timeline, ring subgraph, evidence table). A broad query can
+    #      score 15k+ accounts and no analyst reviews that many — the
+    #      lightweight `results` list still carries every scored account, so
+    #      nothing is hidden, it just isn't pre-assembled into a heavy case.
+    #   2. build_indexes pre-groups transactions + flags by account ONCE so
+    #      each case file is O(that account's activity), not a full-frame
+    #      scan (the earlier per-case scan made a broad query take minutes).
+    # SAR narratives are drafted lazily on case-open (GET /api/case/{id}),
+    # never here.
     events.append({"step": "case_builder", "state": "running", "summary": None, "reason": "assemble case files"})
     t0 = time.monotonic()
-    cases = [
-        case_builder(record, state["rule_flags"], state["graph_flags"], state["df"])
-        for record in risk_records
-    ]
-    events[-1].update(state="done", summary=f"{len(cases)} case files assembled",
-                       elapsed_s=round(time.monotonic() - t0, 3))
-
-    high_cases = [c for c in cases if c.risk_level == "HIGH"]
-    if high_cases:
-        # SAR drafting is I/O-bound (one LLM call each) — a query that
-        # surfaces a whole ring (e.g. an aggregator + its mules) can produce
-        # a dozen HIGH cases at once, and drafting those sequentially would
-        # multiply single-call latency by the case count. Parallelize, and
-        # cap how many get a live draft — beyond the cap, cases still get
-        # the (fast, free, always-available) template narrative rather than
-        # letting an adversarial/broad query spiral into minutes of calls.
-        events.append({"step": "sar_drafter", "state": "running", "summary": None,
-                        "reason": f"draft SAR narratives for {len(high_cases)} HIGH case(s)"})
-        t0 = time.monotonic()
-        live_batch, template_batch = high_cases[:MAX_LIVE_SAR_DRAFTS], high_cases[MAX_LIVE_SAR_DRAFTS:]
-        if live_batch:
-            with ThreadPoolExecutor(max_workers=min(8, len(live_batch))) as pool:
-                narratives = list(pool.map(draft_sar, live_batch))
-            for case, narrative in zip(live_batch, narratives):
-                case.narrative = narrative
-        for case in template_batch:
-            case.narrative = _draft_template(case)
-        summary = f"{len(live_batch)} drafted live"
-        if template_batch:
-            summary += f", {len(template_batch)} via template (over the {MAX_LIVE_SAR_DRAFTS}-draft live cap)"
-        events[-1].update(state="done", summary=summary, elapsed_s=round(time.monotonic() - t0, 3))
+    idx = build_indexes(state["df"], state["rule_flags"], state["graph_flags"])
+    top_records = risk_records[:CASE_BUILD_LIMIT]  # risk_records is already sorted by score desc
+    cases = [case_builder(record, state["df"], idx) for record in top_records]
+    summary = f"{len(cases)} case files assembled"
+    if len(risk_records) > CASE_BUILD_LIMIT:
+        summary += f" (top {CASE_BUILD_LIMIT} of {len(risk_records):,} scored accounts)"
+    events[-1].update(state="done", summary=summary, elapsed_s=round(time.monotonic() - t0, 3))
 
     return {
         "results": [asdict(r) for r in risk_records],

@@ -1,0 +1,87 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": 30,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [
+    "structuring",
+    "velocity",
+    "rapid_movement",
+    "high_risk_amount"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "window_days": 30
+      },
+      "reason": "Scope the dataset to the most recent 30 days of transactions as a reasonable interpretation of 'recently'."
+    },
+    {
+      "tool": "profile_data",
+      "params": {
+        "window_days": 30
+      },
+      "reason": "The query is broad ('everything risky') so a high-level EDA summary helps establish the population baseline before deeper analysis."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "window_days": 30,
+        "features": [
+          "7d_txn_count",
+          "30d_txn_sum",
+          "amount_zscore",
+          "velocity",
+          "pct_near_10k",
+          "rapid_in_out_ratio"
+        ]
+      },
+      "reason": "Per-account rolling features are required to feed into both rules_engine and anomaly_model for full coverage of all typologies."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "structuring",
+          "velocity",
+          "rapid_movement",
+          "high_risk_amount"
+        ]
+      },
+      "reason": "The query asks for 'everything risky', so all named typology rules should be evaluated against the filtered population."
+    },
+    {
+      "tool": "anomaly_model",
+      "params": {
+        "method": "IsolationForest"
+      },
+      "reason": "The broad 'everything risky' query warrants anomaly detection to surface suspicious accounts that may not trigger any specific named rule."
+    },
+    {
+      "tool": "graph_analysis",
+      "params": {
+        "methods": [
+          "fan_in_ring",
+          "short_cycle"
+        ]
+      },
+      "reason": "A broad risk sweep should include network/ring analysis to catch coordinated multi-account patterns not visible at the single-account level."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "inputs": [
+          "rules_engine",
+          "anomaly_model",
+          "graph_analysis"
+        ]
+      },
+      "reason": "Combines all detection signals into a unified LOW/MEDIUM/HIGH risk ranking for analyst review."
+    }
+  ],
+  "skipped": [],
+  "clarification_needed": null
+}

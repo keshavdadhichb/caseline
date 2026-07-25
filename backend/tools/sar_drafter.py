@@ -8,13 +8,16 @@ narrative if the LLM call fails — case files must never ship empty
 
 from __future__ import annotations
 
+import hashlib
 import json
+from pathlib import Path
 
 import anthropic
 
 from tools.case_builder import CaseFile
 
 MODEL = "claude-sonnet-4-6"
+CACHE_DIR = Path(__file__).resolve().parents[2] / ".cache" / "sars"
 
 SYSTEM_PROMPT = (
     "You draft Suspicious Activity Report (SAR) narratives for a bank compliance team. "
@@ -26,10 +29,31 @@ SYSTEM_PROMPT = (
 )
 
 
+def _cache_key(case: CaseFile) -> str:
+    """Hash the case's substantive facts — narratives are cached by evidence,
+    not by account id, so an account whose activity changed gets redrafted
+    while an unchanged flagship case (the demo ring) replays byte-identical."""
+    material = json.dumps(
+        {"account": case.account_id, "typologies": case.typologies, "evidence": case.evidence},
+        sort_keys=True, default=str,
+    )
+    return hashlib.sha256(material.encode()).hexdigest()[:16]
+
+
 def draft_sar(case: CaseFile) -> str:
+    """Live LLM draft first, cached to disk so the demo replays offline
+    (pre-warmed for the flagship ring case). Falls back to a deterministic
+    template on any failure — a case file must never ship without a
+    narrative (CLAUDE.md resilience requirement)."""
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_path = CACHE_DIR / f"{_cache_key(case)}.txt"
     try:
-        return _draft_live(case)
+        narrative = _draft_live(case)
+        cache_path.write_text(narrative)
+        return narrative
     except Exception:  # noqa: BLE001 — case files must never ship without a narrative
+        if cache_path.exists():
+            return cache_path.read_text()
         return _draft_template(case)
 
 

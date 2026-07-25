@@ -61,14 +61,12 @@ ENTITY_LOOKUP_PLAN_BAD_ORDER = {
 }
 
 
-def test_step_order_is_canonical_regardless_of_llm_ordering(monkeypatch):
+def test_step_order_is_canonical_regardless_of_llm_ordering():
     """Regression test for a real bug: a live plan once listed risk_scorer
     before graph_analysis, which ran risk_scorer against an empty
     graph_flags and silently dropped the FAN_IN_RING signal from every
     score (4521 scored 0.65 instead of 1.0, with no "graph" citation).
     The executor must reorder to a safe dependency order internally."""
-    monkeypatch.setattr(executor_module, "draft_sar", lambda case: f"stub narrative for {case.account_id}")
-
     df = load_transactions()
     events: list[dict] = []
     outcome = run_plan(df, ENTITY_LOOKUP_PLAN_BAD_ORDER, events)
@@ -106,12 +104,10 @@ def test_skipped_anomaly_model_never_appears_in_explanations():
     assert tool_events["risk_scorer"] == "done"
 
 
-def test_entity_lookup_plan_resolves_ring_aggregator_end_to_end(monkeypatch):
-    # draft_sar makes a real LLM call per HIGH case (the ring produces 10) —
-    # monkeypatch it so this stays a fast, network-independent unit test.
-    # Live narrative quality is checked by evals/run.py and the manual e2e script.
-    monkeypatch.setattr(executor_module, "draft_sar", lambda case: f"stub narrative for {case.account_id}")
-
+def test_entity_lookup_plan_resolves_ring_aggregator_end_to_end():
+    # No monkeypatching needed: run_plan no longer drafts SARs (narratives
+    # are drafted lazily on case-open, in main.get_case), so this stays fast
+    # and network-independent on its own.
     df = load_transactions()
     events: list[dict] = []
     outcome = run_plan(df, ENTITY_LOOKUP_PLAN, events)
@@ -128,36 +124,27 @@ def test_entity_lookup_plan_resolves_ring_aggregator_end_to_end(monkeypatch):
     assert tool_events["anomaly_model"] == "done"
     assert tool_events["graph_analysis"] == "done"
     assert tool_events["case_builder"] == "done"
-    assert tool_events["sar_drafter"] == "done"
 
     ring_case = next(c for c in outcome["cases"] if c["account_id"] == "4521")
-    assert ring_case["narrative"] == "stub narrative for 4521"
+    assert ring_case["risk_level"] == "HIGH"
+    assert ring_case["ring"] is not None and len(ring_case["ring"]["nodes"]) == 10
+    # narrative is NOT drafted during the run — it's lazy, filled on case-open
+    assert ring_case["narrative"] is None
 
 
-def test_sar_draft_cap_falls_back_to_template_beyond_cap(monkeypatch):
-    """The ring produces 10 HIGH cases (aggregator + 9 mules). Lower the
-    live-draft cap to 3 to deterministically exercise the overflow path
-    without needing more than 10 real HIGH accounts in the fixture data."""
-    monkeypatch.setattr(executor_module, "MAX_LIVE_SAR_DRAFTS", 3)
-    monkeypatch.setattr(executor_module, "draft_sar", lambda case: f"LIVE:{case.account_id}")
-
+def test_run_plan_does_not_draft_sars_even_for_many_high_cases():
+    """run_plan must stay fast regardless of HIGH-case count — a broad query
+    can surface hundreds of HIGH accounts, and drafting a narrative for each
+    up-front is exactly what blew the per-query budget before drafting went
+    lazy. No case should come back with a narrative from the run itself."""
     df = load_transactions()
     events: list[dict] = []
     outcome = run_plan(df, ENTITY_LOOKUP_PLAN, events)
 
     high_cases = [c for c in outcome["cases"] if c["risk_level"] == "HIGH"]
-    assert len(high_cases) == 10
-    live = [c for c in high_cases if c["narrative"].startswith("LIVE:")]
-    templated = [c for c in high_cases if not c["narrative"].startswith("LIVE:")]
-    assert len(live) == 3
-    assert len(templated) == 7
-    for c in templated:
-        assert "template" in c["narrative"].lower()
-
-    sar_event = next(e for e in events if e["step"] == "sar_drafter")
-    assert sar_event["state"] == "done"
-    assert "3 drafted live" in sar_event["summary"]
-    assert "7 via template" in sar_event["summary"]
+    assert len(high_cases) == 10  # ring aggregator + 9 mules
+    assert all(c["narrative"] is None for c in high_cases)
+    assert not any(e["step"] == "sar_drafter" for e in events)
 
 
 def test_run_plan_reports_a_summary_per_executed_step():

@@ -1,0 +1,76 @@
+{
+  "intent": "detect_ring",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": []
+  },
+  "typologies": [
+    "rapid_movement"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "accounts": [],
+        "min_amount": null,
+        "window_days": null
+      },
+      "reason": "Scope the full dataset before passing to downstream tools. No specific account, amount, or time filter specified, so all data is included."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "features": [
+          "rapid_in_out_ratio",
+          "7d_txn_count",
+          "30d_txn_count",
+          "velocity"
+        ]
+      },
+      "reason": "Compute per-account rapid in->out ratios and velocity features needed to identify accounts that quickly pass funds along \u2014 a hallmark of round-tripping rings."
+    },
+    {
+      "tool": "graph_analysis",
+      "params": {
+        "detection_modes": [
+          "short_cycle",
+          "fan_in_ring"
+        ],
+        "max_cycle_length": 6
+      },
+      "reason": "Core tool for this query: detects circular fund flows using networkx short-cycle and fan-in ring detection across the full transaction network."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "rapid_movement"
+        ]
+      },
+      "reason": "Flags accounts exhibiting rapid in->out movement, which frequently co-occurs with circular round-tripping patterns and strengthens detection confidence."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "inputs": [
+          "rules_engine",
+          "graph_analysis",
+          "feature_engine"
+        ]
+      },
+      "reason": "Aggregates graph ring findings, rapid_movement rule hits, and velocity features into a final LOW/MEDIUM/HIGH risk score per account/entity involved in detected cycles."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted typology detection query (ring/cycle patterns), not a broad overview or EDA request \u2014 a population-level summary adds no value here."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "The query has a specific, well-defined typology (circular round-tripping). Graph analysis + rules_engine are the precise tools for this; the anomaly model's population-wide outlier scoring is redundant and would not improve cycle detection."
+    }
+  ],
+  "clarification_needed": null
+}

@@ -19,6 +19,8 @@ from agent.executor import run_plan
 from agent.planner import plan_query
 from app.data_loader import load_transactions
 from tools.anomaly_model import _baseline as warm_anomaly_baseline
+from tools.case_builder import CaseFile
+from tools.sar_drafter import draft_sar
 
 
 @asynccontextmanager
@@ -111,4 +113,9 @@ def get_case(case_id: str) -> dict:
     case = CASES.get(case_id)
     if case is None:
         raise HTTPException(404, "unknown case_id")
+    # SAR narratives are drafted lazily, on first open — the only time a SAR
+    # is actually needed. HIGH cases are the "report" tier; MEDIUM/LOW don't
+    # warrant a SAR. Cached (in memory + on disk) so a re-open is instant.
+    if case.get("narrative") is None and case["risk_level"] == "HIGH":
+        case["narrative"] = draft_sar(CaseFile(**case))
     return case
