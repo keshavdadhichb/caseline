@@ -132,17 +132,26 @@ def _fan_in(df: pd.DataFrame, g: nx.DiGraph) -> list[GraphFlag]:
 
 
 def _cycles(g: nx.DiGraph) -> list[GraphFlag]:
-    """Short round-trip cycles (<=5 hops) — funds return to (near) their
-    origin, a classic layering signature. Restricted to a bounded-degree
-    subgraph: hub accounts (banks, clearing houses) sit in huge numbers of
-    incidental cycles that mean nothing and would blow up the search."""
+    """Short round-trip cycles (3-5 hops) — funds return to (near) their
+    origin via multiple distinct parties, a classic layering signature.
+    Restricted to a bounded-degree subgraph: hub accounts (banks, clearing
+    houses) sit in huge numbers of incidental cycles that mean nothing and
+    would blow up the search.
+
+    Length-2 "cycles" (A pays B, B pays A) are deliberately excluded: that's
+    just any two parties who transact in both directions — bill-splitting,
+    a repaid loan, routine mutual business — extremely common and not
+    "round-tripping" in the layering sense CLAUDE.md describes. A fixture
+    regression test (two ordinary reciprocal-payment accounts) caught this
+    firing before the >=3 floor was added.
+    """
     low_degree_nodes = [n for n in g.nodes if g.degree(n) <= CYCLE_MAX_NODE_DEGREE]
     sub = g.subgraph(low_degree_nodes)
 
     flags: list[GraphFlag] = []
     seen_cycles: set[frozenset] = set()
     for cycle in nx.simple_cycles(sub, length_bound=CYCLE_MAX_HOPS):
-        if len(cycle) < 2:
+        if len(cycle) < 3:
             continue
         key = frozenset(cycle)
         if key in seen_cycles:
