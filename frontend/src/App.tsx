@@ -41,6 +41,8 @@ export interface Message {
   clarify?: string;
   empty?: boolean;
   error?: string;
+  notice?: string;
+  unknownAccounts?: string[];
   /** Set when the planner ran no tools at all — a conceptual question. */
   typologies?: TypologyExplainer[];
 }
@@ -154,7 +156,25 @@ export default function App() {
         return;
       }
       setPendingClarify(null);
-      patch((m) => ({ ...m, thinking: false, prose1: submitted.prose, steps: submitted.steps ?? [] }));
+
+      // An account the dataset has never seen: say so and stop. Scanning the
+      // book would surface some unrelated account and read as an answer.
+      const unknown = submitted.unknown_accounts ?? [];
+      if (unknown.length) {
+        patch((m) => ({
+          ...m, thinking: false, steps: [], unknownAccounts: unknown,
+          prose1: `No account matching ${unknown.join(", ")} exists in this dataset, so there is nothing to analyse. Check the identifier, or open Flagged accounts to browse what is present.`,
+        }));
+        return;
+      }
+
+      patch((m) => ({
+        ...m, thinking: false, prose1: submitted.prose, steps: submitted.steps ?? [],
+        // A generic fallback plan must never be narrated as understanding.
+        notice: submitted.degraded
+          ? "The planner could not reach the model for this question, so this is a generic sweep rather than a plan built for what you asked. Treat the results as a broad scan."
+          : undefined,
+      }));
 
       // A conceptual question ("what is structuring?") runs nothing. Answer
       // it from the real rule constants instead of polling a run that will
@@ -220,7 +240,13 @@ export default function App() {
       chips.push({ kind: "method", label: "Method & performance", detail: "12 / 12 evals passing" });
 
       patch((m) => ({ ...m, prose2: res.prose ?? undefined, chips }));
-      if (top) void openCase(top.case_id);
+      // Only surface a case automatically when it is plausibly the answer: a
+      // named-entity query should open that entity, never a stranger.
+      const named = submitted.plan.filters.accounts ?? [];
+      const answer = named.length
+        ? res.cases.find((c) => named.some((a) => c.account_id === String(a)))
+        : top;
+      if (answer) void openCase(answer.case_id);
     } catch (err) {
       patch((m) => ({
         ...m, thinking: false,

@@ -243,8 +243,19 @@ function FlowPanel({ file }: { file: CaseFile }) {
 
   const hub = file.account_id;
   const senders = ring.nodes.filter((n) => n !== hub && ring.edges.some((e) => e.from === n && e.to === hub));
-  const exits = [...new Set(ring.edges.filter((e) => e.from === hub).map((e) => e.to))];
-  const others = ring.nodes.filter((n) => n !== hub && !senders.includes(n) && !exits.includes(n));
+
+  // A busy aggregator can scatter to dozens of counterparties. Drawing them
+  // all stacks their labels into an unreadable wall (and the picture stops
+  // saying anything), so show the largest few by amount and count the rest.
+  const EXIT_LIMIT = 4;
+  const exitTotals = new Map<string, number>();
+  for (const e of ring.edges) {
+    if (e.from === hub) exitTotals.set(e.to, (exitTotals.get(e.to) ?? 0) + e.amount);
+  }
+  const rankedExits = [...exitTotals.entries()].sort((a, b) => b[1] - a[1]);
+  const exits = rankedExits.slice(0, EXIT_LIMIT).map(([id]) => id);
+  const hiddenExits = rankedExits.length - exits.length;
+  const others = ring.nodes.filter((n) => n !== hub && !senders.includes(n) && !exitTotals.has(n));
 
   const W = 400, H = 330, CX = 240, CY = 160;
   const senderPos = senders.map((_, i) => {
@@ -252,7 +263,7 @@ function FlowPanel({ file }: { file: CaseFile }) {
     return { x: CX + Math.cos(a) * 205, y: CY + Math.sin(a) * 150 };
   });
   const exitPos = exits.map((_, i) => ({
-    x: 348, y: exits.length === 1 ? CY : 86 + (i / Math.max(1, exits.length - 1)) * 148,
+    x: 348, y: exits.length === 1 ? CY : 60 + (i / Math.max(1, exits.length - 1)) * 200,
   }));
   const inTotal = ring.edges.filter((e) => e.to === hub).reduce((s, e) => s + e.amount, 0);
 
@@ -309,7 +320,16 @@ function FlowPanel({ file }: { file: CaseFile }) {
           </g>
           <g fontFamily="var(--mono)" fontSize="10" fill="var(--ink-2)" style={{ animation: "fadeIn 300ms ease-out both", animationDelay: ".7s" }}>
             <text x={CX} y={CY + 36} textAnchor="middle">{hub}</text>
-            {exitPos.map((p, i) => <text key={exits[i]} x={p.x} y={p.y - 18} textAnchor="middle">{exits[i]}</text>)}
+            {exitPos.map((p, i) => (
+              <text key={exits[i]} x={p.x} y={p.y - 17} textAnchor="middle" fontSize="9">
+                {exits[i].length > 14 ? `${exits[i].slice(0, 13)}\u2026` : exits[i]}
+              </text>
+            ))}
+            {hiddenExits > 0 && (
+              <text x={348} y={300} textAnchor="middle" fontSize="9" fill="var(--ink-3)">
+                +{hiddenExits} more
+              </text>
+            )}
           </g>
         </svg>
       </div>
@@ -324,7 +344,10 @@ function FlowPanel({ file }: { file: CaseFile }) {
       <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 8, animation: "fadeUp6 var(--dur-base) var(--ease-out) both", animationDelay: "120ms" }}>
         <DetailRow k="Aggregator" v={hub} mono />
         <DetailRow k="Senders" v={`${senders.length} accounts`} mono />
-        {exits.length > 0 && <DetailRow k="Onward to" v={exits.join(" · ")} mono />}
+        {rankedExits.length > 0 && (
+          <DetailRow k="Onward to" mono
+            v={`${rankedExits.length} account${rankedExits.length === 1 ? "" : "s"}${hiddenExits > 0 ? ` (showing ${exits.length} largest)` : `: ${exits.join(" · ")}`}`} />
+        )}
         <DetailRow k="Consolidated" v={usd(inTotal)} mono />
       </div>
     </div>

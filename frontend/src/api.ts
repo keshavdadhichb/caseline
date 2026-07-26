@@ -43,6 +43,11 @@ export interface SubmitResponse {
   /** True when the planner decided the question needs no data work at all. */
   conceptual?: boolean;
   typologies?: TypologyExplainer[] | null;
+  /** Accounts the query named that do not exist in the dataset. */
+  unknown_accounts?: string[];
+  /** The plan is the generic offline fallback, not one built for this query. */
+  degraded?: boolean;
+  served_from_cache?: boolean;
 }
 
 export interface TraceEvent {

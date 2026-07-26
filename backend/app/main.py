@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 from agent.executor import run_plan
 from agent.planner import plan_query
-from app.data_loader import load_transactions
+from app.data_loader import known_accounts, load_transactions
 from tools.anomaly_model import ANOMALY_TOP_PERCENTILE, N_ESTIMATORS, RANDOM_STATE
 from tools.anomaly_model import _baseline as warm_anomaly_baseline
 from tools.case_builder import CaseFile
@@ -127,8 +127,17 @@ def submit_query(req: QueryRequest, background_tasks: BackgroundTasks) -> dict:
         TRACES[trace_id] = {"status": "done", "events": [], "results": [], "cases": []}
         return {"trace_id": trace_id, "plan": plan, "clarification_needed": plan["clarification_needed"]}
 
+    # An entity the dataset has never seen cannot be answered by scanning the
+    # book: report it plainly instead of running a sweep and surfacing some
+    # unrelated account's case as though it were the answer.
+    requested = [str(a) for a in (plan.get("filters") or {}).get("accounts") or []]
+    unknown = [a for a in requested if a not in known_accounts()]
+
     TRACES[trace_id] = {"status": "running", "events": [], "results": [], "cases": [], "plan": plan}
-    background_tasks.add_task(_execute, trace_id, plan)
+    if not (unknown and len(unknown) == len(requested)):
+        background_tasks.add_task(_execute, trace_id, plan)
+    else:
+        TRACES[trace_id]["status"] = "done"
     # `prose` and `steps` are derived deterministically from the plan itself
     # (tools/narrate.py) — no second LLM call, and nothing asserted that the
     # plan doesn't already state. They ship with the POST so the thread can
@@ -146,6 +155,12 @@ def submit_query(req: QueryRequest, background_tasks: BackgroundTasks) -> dict:
         # rule modules' own constants.
         "conceptual": is_conceptual(plan),
         "typologies": explain_typologies() if is_conceptual(plan) else None,
+        "unknown_accounts": unknown,
+        # True when this plan is the generic offline fallback rather than a
+        # plan built for this question. The UI must not narrate it as if the
+        # agent understood the query.
+        "degraded": bool(plan.get("_offline_fallback")),
+        "served_from_cache": bool(plan.get("_served_from_cache")),
     }
 
 

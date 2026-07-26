@@ -90,6 +90,13 @@ function AgentTurn({ m, onOpenChip, onRetry, onAnswer }: {
           </div>
         )}
 
+        {m.notice && (
+          <div style={{ display: "flex", gap: 10, padding: "12px 14px", borderRadius: 10, background: "var(--sev-med-bg)", color: "var(--sev-med-fg)", fontSize: 13.5, lineHeight: 1.55, animation: "fadeUp10 var(--dur-base) var(--ease-out) both" }}>
+            <span className="dot" style={{ background: "var(--sev-med)", marginTop: 7 }} />
+            <span style={{ maxWidth: "58ch" }}>{m.notice}</span>
+          </div>
+        )}
+
         {m.prose1 && <p style={{ margin: 0, fontSize: 15, lineHeight: 1.62, maxWidth: "62ch", animation: "fadeUp10 var(--dur-base) var(--ease-out) both" }}>{m.prose1}</p>}
 
         {m.steps && m.steps.length > 0 && <PlanCard steps={m.steps} />}

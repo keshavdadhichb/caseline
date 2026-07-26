@@ -22,7 +22,7 @@ from pathlib import Path
 import anthropic
 
 MODEL = "claude-sonnet-4-6"
-LIVE_TIMEOUT_SECONDS = 8.0
+LIVE_TIMEOUT_SECONDS = 20.0
 CACHE_DIR = Path(__file__).resolve().parents[2] / ".cache" / "plans"
 
 TOOL_CATALOG = [
