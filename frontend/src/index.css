@@ -1,31 +1,132 @@
-@import "tailwindcss";
+/* Caseline — design tokens transcribed verbatim from the Claude Design
+   project (Caseline.dc.html). Values are the design's own literals; nothing
+   is approximated. Fonts are self-hosted (@fontsource) rather than pulled
+   from Google Fonts so the demo renders identically with wifi off.
 
-/* Caseline design tokens (CLAUDE.md — LAW).
-   Color means risk. Nothing else may use red/amber/green. */
-@theme {
-  --color-bg: #f7f8fa;
-  --color-surface: #ffffff;
-  --color-ink: #16181d;
-  --color-muted: #5b6472;
-  --color-accent: #1f3a5f;
-  --color-risk-high: #b3261e;
-  --color-risk-med: #b45309;
-  --color-risk-low: #1e7b4f;
-  --color-hairline: #e4e7ec;
+   Tailwind is intentionally not used here: the design specifies exact
+   inline styles throughout, and matching it 1:1 in plain CSS + inline
+   style objects avoids a translation layer that could drift from it. */
 
-  --font-sans: "Inter Variable", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+@import "@fontsource/dm-sans/400.css";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-mono/400.css";
+@import "@fontsource/dm-mono/500.css";
 
-  --radius-DEFAULT: 6px;
+:root {
+  --sans: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+
+  --bg: #F2F0EA;
+  --side-bg: #E7E4DB;
+  --side-border: #DBD7CC;
+  --surface: #FFFFFF;
+
+  --ink: #494D5F;
+  --muted: #6E7385;
+  --faint: #9AA0B2;
+
+  --accent: #8458B3;
+  --accent-hover: #6F449C;
+  --accent-tint: #F2ECFB;
+  --accent-tint-border: #D0BDF4;
+
+  --border: #E1E7F2;
+  --border-strong: #CBD4E6;
+  --tint: #F2F5FB;
+  --tint-hover: #ECF0F9;
+  --row-hover: #F8FAFD;
+
+  --risk-high-bg: #FAEDF0;
+  --risk-high-fg: #9E4459;
+  --risk-high-dot: #D98BA0;
+  --risk-ok-bg: #EAF4EF;
+  --risk-ok-fg: #3A7761;
+  --risk-ok-dot: #96C7B1;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-html {
-  background: var(--color-bg);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
+html, body { margin: 0; height: 100%; }
+#root { height: 100%; }
+* { box-sizing: border-box; }
+
+body {
+  font-family: var(--sans);
+  color: var(--ink);
+  background: var(--bg);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* every numeric column reads in tabular figures */
-.tnum {
+button {
+  font: inherit; color: inherit; background: none; border: none;
+  padding: 0; margin: 0; cursor: pointer; text-align: left;
   font-variant-numeric: tabular-nums;
 }
+input { font: inherit; color: var(--ink); }
+input::placeholder { color: var(--faint); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-hover); }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: var(--accent-tint); }
+
+@keyframes fadeUp   { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fadeUp6  { from { opacity: 0; transform: translateY(6px); }  to { opacity: 1; transform: none; } }
+@keyframes fadeUp8  { from { opacity: 0; transform: translateY(8px); }  to { opacity: 1; transform: none; } }
+@keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.78); } }
+@keyframes dotsPulse{ 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@keyframes canvasIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes drawEdge { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes dotIn    { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes nodeIn   { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+@keyframes tickDraw { from { stroke-dashoffset: 12; } to { stroke-dashoffset: 0; } }
+@keyframes strike   { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes dotPop   { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.5); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+/* The design's fixed grain overlay. */
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none;
+  z-index: 2147483647; opacity: .06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; }
+}
+
+/* Shared primitives. The design repeats these inline; centralising them
+   keeps the components readable without changing any rendered value. */
+.label {
+  font-size: 11px; line-height: 1.3; font-weight: 500;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint);
+}
+.mono { font-family: var(--mono); }
+.pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: 999px; padding: 6px 12px; font-size: 13.5px; line-height: 1.5;
+}
+.dot { width: 6px; height: 6px; border-radius: 999px; flex: none; }
+
+/* Hover states the design expresses via style-hover="…". */
+.hv-row { transition: background 120ms; }
+.hv-row:hover { background: var(--row-hover); }
+.hv-tint { transition: background 120ms; }
+.hv-tint:hover { background: var(--tint); }
+.hv-violet { transition: background 120ms, border-color 120ms, color 120ms; }
+.hv-violet:hover { background: var(--accent-tint); border-color: var(--accent-tint-border); color: var(--ink); }
+.hv-white { transition: background 120ms; }
+.hv-white:hover { background: var(--surface); }
+.hv-accent { transition: background 120ms, transform 200ms; }
+.hv-accent:hover { background: var(--accent-hover); }
+.hv-accent:active { transform: scale(0.98); }
+
+.scroll { overflow-y: auto; }
+.scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.scroll::-webkit-scrollbar-thumb { background: #DCD9D0; border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+.scroll::-webkit-scrollbar-track { background: transparent; }
+
+/* Collapsible sections use the design's grid-template-rows 0fr/1fr technique. */
+.collapse { display: grid; transition: grid-template-rows 300ms var(--ease); }
+.collapse > div { overflow: hidden; min-height: 0; }

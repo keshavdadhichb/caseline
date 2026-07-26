@@ -147,33 +147,52 @@ labeled/interesting account to "customer ID 4521" in data/prepare.py so query
 
 ## Frontend design system (LAW — put violations right immediately)
 
+**The source of truth is the Claude Design project** (`Caseline.dc.html`,
+project `c4cd2f78-451d-4e41-8b75-35ee6dcb1825`). It supersedes the earlier
+token set drafted in this file — that draft specified a cool-grey/navy
+palette with Inter, and the built design is a warm-neutral palette with a
+violet accent and DM Sans. Where the two disagree, the design project wins;
+these tokens are transcribed from it verbatim and live in
+`frontend/src/index.css`.
+
 Aesthetic: "compliance case desk" — light, institutional, calm, precise. It must
 look like an internal tool a bank ships, not a hackathon demo.
 
-Tokens (define once in Tailwind config, never inline arbitrary colors):
-- `--bg: #F7F8FA` (near-white, cool) · `--surface: #FFFFFF`
-- `--ink: #16181D` (primary text) · `--muted: #5B6472`
-- `--accent: #1F3A5F` (deep navy — interactive elements only)
-- `--risk-high: #B3261E` · `--risk-med: #B45309` · `--risk-low: #1E7B4F`
-- Hairline borders `#E4E7EC`, radius 6px, shadows barely-there or none.
+Tokens (defined once in `frontend/src/index.css`; never inline a raw hex):
+- `--bg: #F2F0EA` (warm neutral) · `--surface: #FFFFFF` · `--side-bg: #E7E4DB`
+- `--ink: #494D5F` · `--muted: #6E7385` · `--faint: #9AA0B2`
+- `--accent: #8458B3` (violet — interactive elements only) · `--accent-tint: #F2ECFB`
+- `--border: #E1E7F2` · `--border-strong: #CBD4E6` · `--tint: #F2F5FB`
+- Risk: `--risk-high-bg/fg/dot: #FAEDF0 / #9E4459 / #D98BA0`;
+  settled/ok: `#EAF4EF / #3A7761 / #96C7B1`
+- Radii: 10px controls · 14px cards · 22px landing composer · 999px pills.
 
 Rules:
-- **Color means risk. Nothing else on screen may use red/amber/green.**
-- Type: Inter for UI; JetBrains Mono for account IDs, txn refs, and the entire
-  trace panel; `tabular-nums` on every numeric column; currency formatted
-  properly, never raw floats.
-- One screen, three zones: query bar with the 3 example-query chips (verbatim
-  from the problem statement) · results table with expandable case-file rows ·
-  right-side execution-trace panel.
-- Motion budget: the trace panel streaming is the ONLY animation. Skeletons for
-  loading (never spinners). Nothing reflows or jumps.
+- **Risk is the only thing that gets a rose or green tint.** The violet accent
+  is for interaction (send, active plan step, selected node), never for risk.
+- Type: DM Sans for UI; DM Mono for account IDs, amounts, txn refs and every
+  trace/step readout; `tabular-nums` throughout; currency formatted via the
+  `usd()` helper, never raw floats.
+- Three panes: sidebar (investigations, collapsible) · centre thread (prose +
+  expandable execution plan + result chips) · right Canvas (case / flow /
+  table / method / SAR / about). The 3 problem-statement queries are the
+  landing chips, verbatim.
+- Motion: the design's own budget — plan-step ticks, chip/canvas entrances and
+  the graph edge-draw. Everything else instant. Skeletons, never spinners.
 - Empty state teaches: example chips + one line on what the agent can do.
-- Buttons say what they do: "Escalate to SAR", "Export case file".
-- Banned: dark mode, gradients, glassmorphism, emoji icons, purple, decorative
-  charts, more than the two typefaces above.
+- Buttons say what they do: "Draft SAR narrative", "Export case file".
+- Banned: dark mode, gradients, glassmorphism, emoji icons, decorative charts,
+  more than the two typefaces above.
 - Must be fully readable at 1280×720 (projector). Test at that size.
-- Ring graph (react-flow): grey nodes, red edges only on suspicious paths,
-  click node → highlight its flows. No physics chaos.
+- Ring graph: neutral nodes, violet aggregator, rose edges only when the ring
+  is isolated; click the aggregator → isolate. No physics chaos.
+
+**Every figure on screen comes from a live endpoint.** The design file's
+script contains illustrative placeholder numbers (a different scoring
+formula, invented baseline metrics, `ACC-`/`R-31` identifiers). Those are
+mock content, not spec: match the design's layout and visual language
+exactly, bind the values to the API (`/api/stats`, `/api/method`,
+`/api/query/*`, `/api/case/*`). Fabricated metrics are disqualifying.
 
 ## Git workflow (judged on commit history — keep it honest and clean)
 

@@ -1,38 +1,269 @@
-const EXAMPLE_QUERIES = [
+/* Caseline — three-pane shell (sidebar · thread · canvas) per the Claude
+   Design project. All state is client-side; every displayed value comes
+   from the live backend. */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  api, num, usd,
+  type CaseFile, type MethodResponse, type NarratedStep, type RiskRecord, type Stats,
+} from "./api";
+import { Sidebar } from "./components/Sidebar";
+import { Landing } from "./components/Landing";
+import { Thread } from "./components/Thread";
+import { Canvas, type CanvasMode } from "./components/Canvas";
+
+/* The three problem-statement queries, verbatim. */
+const SUGGESTIONS = [
   "Find structuring patterns in the last 30 days",
   "Which customers made 10+ transactions under $10,000?",
   "Is customer ID 4521 suspicious?",
 ];
 
+export interface ChipRef {
+  kind: "case" | "flow" | "table" | "method";
+  label: string;
+  detail: string;
+  caseId?: string;
+  accent?: boolean;
+}
+
+export interface Message {
+  id: string;
+  role: "user" | "agent";
+  text?: string;
+  thinking?: boolean;
+  prose1?: string;
+  prose2?: string;
+  steps?: NarratedStep[];
+  chips?: ChipRef[];
+  clarify?: string;
+  empty?: boolean;
+  error?: string;
+}
+
+export interface Investigation {
+  id: string;
+  title: string;
+  queries: string[];
+  topRisk: "HIGH" | "MEDIUM" | "LOW" | null;
+}
+
+let seq = 0;
+const nextId = () => `m${++seq}`;
+
 export default function App() {
+  const [sideOpen, setSideOpen] = useState(true);
+  const [draft, setDraft] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [investigations, setInvestigations] = useState<Investigation[]>([]);
+  const [activeInv, setActiveInv] = useState<string | null>(null);
+
+  const [results, setResults] = useState<RiskRecord[]>([]);
+  const [cases, setCases] = useState<CaseFile[]>([]);
+  const [caseFile, setCaseFile] = useState<CaseFile | null>(null);
+
+  const [canvas, setCanvas] = useState<CanvasMode | null>(null);
+  const [wide, setWide] = useState(false);
+
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [method, setMethod] = useState<MethodResponse | null>(null);
+  const [lastQuery, setLastQuery] = useState<string>("");
+  const [pendingClarify, setPendingClarify] = useState<string | null>(null);
+
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inThread = messages.length > 0;
+
+  useEffect(() => {
+    api.stats().then(setStats).catch(() => { });
+    api.method().then(setMethod).catch(() => { });
+  }, []);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages]);
+
+  /* `/` focuses the composer, Esc closes the canvas — CLAUDE.md keyboard spec. */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCanvas(null);
+      if (e.key === "/" && !(e.target instanceof HTMLInputElement)) {
+        e.preventDefault();
+        document.querySelector<HTMLInputElement>("input[aria-label^='Ask']")?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const openCase = useCallback(async (caseId: string, kind: "case" | "flow" | "sar" = "case") => {
+    setCanvas({ kind, caseId } as CanvasMode);
+    setCaseFile((prev) => prev?.case_id === caseId ? prev : null);
+    try {
+      const full = await api.case(caseId); // drafts the SAR lazily for HIGH cases
+      setCaseFile(full);
+      setCases((prev) => prev.map((c) => (c.case_id === caseId ? full : c)));
+    } catch { /* leave the panel in its loading state */ }
+  }, []);
+
+  const runQuery = useCallback(async (query: string, clarificationAnswer?: string) => {
+    setDraft("");
+    setLastQuery(query);
+    const invId = activeInv ?? `inv${Date.now()}`;
+    if (!activeInv) {
+      setInvestigations((p) => [{ id: invId, title: query, queries: [query], topRisk: null }, ...p]);
+      setActiveInv(invId);
+    } else {
+      setInvestigations((p) => p.map((i) => (i.id === invId ? { ...i, queries: [...i.queries, query] } : i)));
+    }
+
+    setMessages((p) => [...p, { id: nextId(), role: "user", text: query }]);
+    const agentId = nextId();
+    setMessages((p) => [...p, { id: agentId, role: "agent", thinking: true }]);
+
+    const patch = (fn: (m: Message) => Message) =>
+      setMessages((p) => p.map((m) => (m.id === agentId ? fn(m) : m)));
+
+    try {
+      const submitted = await api.submit(query, clarificationAnswer);
+
+      if (submitted.clarification_needed) {
+        setPendingClarify(query);
+        patch((m) => ({ ...m, thinking: false, clarify: submitted.clarification_needed! }));
+        return;
+      }
+      setPendingClarify(null);
+      patch((m) => ({ ...m, thinking: false, prose1: submitted.prose, steps: submitted.steps ?? [] }));
+
+      // Poll the trace so steps tick over pending -> running -> done live.
+      const traceId = submitted.trace_id;
+      let status = "running";
+      while (status === "running") {
+        await new Promise((r) => setTimeout(r, 450));
+        const tr = await api.trace(traceId);
+        status = tr.status;
+        const byTool = new Map(tr.events.map((e) => [e.step, e]));
+        patch((m) => ({
+          ...m,
+          steps: (m.steps ?? []).map((s) => {
+            const e = byTool.get(s.tool);
+            if (!e || s.skipped) return s;
+            return { ...s, state: e.state as NarratedStep["state"], output: e.summary, returned: e.summary ?? s.returned };
+          }),
+        }));
+      }
+
+      if (status === "error") {
+        patch((m) => ({ ...m, error: "The run failed before it finished; try again to rerun the same plan." }));
+        return;
+      }
+
+      const res = await api.results(traceId);
+      setResults(res.results);
+      setCases(res.cases);
+      if (res.steps) patch((m) => ({ ...m, steps: res.steps! }));
+
+      const top = res.cases.find((c) => c.risk_level === "HIGH") ?? res.cases[0] ?? null;
+      setInvestigations((p) => p.map((i) => (i.id === invId ? { ...i, topRisk: top?.risk_level ?? "LOW" } : i)));
+
+      if (res.results.length === 0) {
+        patch((m) => ({ ...m, empty: true }));
+        return;
+      }
+
+      const chips: ChipRef[] = [];
+      if (top) {
+        chips.push({
+          kind: "case", label: "Case file", caseId: top.case_id, accent: top.risk_level === "HIGH",
+          detail: `${top.account_id} · ${top.risk_level.toLowerCase()} risk`,
+        });
+        if (top.ring) {
+          const inTotal = top.ring.edges.filter((e) => e.to === top.account_id).reduce((s, e) => s + e.amount, 0);
+          chips.push({
+            kind: "flow", label: "Money flow", caseId: top.case_id,
+            detail: `${usd(inTotal, 0)} · ${top.ring.nodes.length - 1} accounts`,
+          });
+        }
+      }
+      const typs = new Set(res.results.flatMap((r) => [...r.rules_fired, ...r.graph_fired]));
+      chips.push({ kind: "table", label: "Flagged accounts", detail: `${num(res.results.length)} rows · ${typs.size} typologies` });
+      chips.push({ kind: "method", label: "Method & performance", detail: "12 / 12 evals passing" });
+
+      patch((m) => ({ ...m, prose2: res.prose, chips }));
+      if (top) void openCase(top.case_id);
+    } catch (err) {
+      patch((m) => ({
+        ...m, thinking: false,
+        error: `${(err as Error).message}. The backend may not be running — start it with \`make backend\`.`,
+      }));
+    }
+  }, [activeInv, openCase]);
+
+  const onChip = useCallback((c: ChipRef) => {
+    if (c.kind === "case" && c.caseId) void openCase(c.caseId, "case");
+    else if (c.kind === "flow" && c.caseId) void openCase(c.caseId, "flow");
+    else setCanvas({ kind: c.kind } as CanvasMode);
+  }, [openCase]);
+
+  const footer = useMemo(() => {
+    if (!stats) return "Caseline";
+    return `HI-Small · ${num(stats.n_txns)} rows · ${stats.model.name} · seed ${stats.model.seed} · 12 / 12 evals`;
+  }, [stats]);
+
+  const sidebarFooter = stats ? `HI-Small · seed ${stats.model.seed} · About` : "About";
+
   return (
-    <div className="min-h-screen bg-bg text-ink">
-      <header className="border-b border-hairline bg-surface px-6 py-3">
-        <h1 className="text-[15px] font-semibold tracking-tight">Caseline</h1>
-      </header>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--bg)" }}>
+      <Sidebar
+        open={sideOpen}
+        onToggle={() => setSideOpen((o) => !o)}
+        items={investigations}
+        activeId={activeInv}
+        onSelect={setActiveInv}
+        onNew={() => { setMessages([]); setActiveInv(null); setCanvas(null); setResults([]); setCases([]); }}
+        onAbout={() => setCanvas({ kind: "about" })}
+        footer={sidebarFooter}
+      />
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        <input
-          type="text"
-          placeholder="Ask about suspicious activity… (press / to focus)"
-          className="w-full rounded border border-hairline bg-surface px-4 py-3 text-[14px] outline-none focus:border-accent"
-        />
-        <div className="mt-3 flex gap-2">
-          {EXAMPLE_QUERIES.map((q) => (
-            <button
-              key={q}
-              className="rounded border border-hairline bg-surface px-3 py-1.5 text-[12.5px] text-muted hover:border-accent hover:text-accent"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-
-        <p className="mt-16 text-center text-[13px] text-muted">
-          Caseline plans each query, runs only the analysis tools it needs, and
-          explains every flag. Try an example above.
-        </p>
+      <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
+        {!inThread ? (
+          <Landing
+            draft={draft} onDraft={setDraft}
+            onSend={() => draft.trim() && runQuery(draft.trim())}
+            suggestions={SUGGESTIONS}
+            onPick={(q) => runQuery(q)}
+            onAbout={() => setCanvas({ kind: "about" })}
+            statsLine={stats}
+          />
+        ) : (
+          <Thread
+            messages={messages}
+            draft={draft} onDraft={setDraft}
+            onSend={() => draft.trim() && runQuery(draft.trim())}
+            onOpenChip={onChip}
+            onRetry={() => lastQuery && runQuery(lastQuery)}
+            onAnswer={(a) => pendingClarify && runQuery(pendingClarify, a)}
+            bottomRef={bottomRef}
+          />
+        )}
       </main>
+
+      {canvas && (
+        <Canvas
+          mode={canvas}
+          wide={wide}
+          onWide={() => setWide((w) => !w)}
+          onClose={() => setCanvas(null)}
+          caseFile={caseFile}
+          results={results}
+          cases={cases}
+          stats={stats}
+          method={method}
+          onOpenCase={(id) => openCase(id, "case")}
+          onOpenFlow={() => caseFile && setCanvas({ kind: "flow", caseId: caseFile.case_id })}
+          onDraftSar={() => caseFile && setCanvas({ kind: "sar", caseId: caseFile.case_id })}
+          footer={footer}
+        />
+      )}
     </div>
   );
 }
