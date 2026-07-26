@@ -9,6 +9,7 @@ import {
   type CaseFile, type MethodResponse, type RiskRecord, type Stats,
 } from "../api";
 import { Button, Chevron, Collapse, DetailRow, Pill, SectionLabel } from "./ui";
+import { Explain } from "./Explain";
 
 export type CanvasMode =
   | { kind: "case"; caseId: string }
@@ -157,8 +158,8 @@ function EvidenceRow({ ev }: { ev: Record<string, unknown> }) {
   );
 }
 
-function CasePanel({ file, stats, onDraftSar, onOpenFlow }: {
-  file: CaseFile; stats: Stats | null; onDraftSar: () => void; onOpenFlow: () => void;
+function CasePanel({ file, stats, onDraftSar, onOpenFlow, geminiOn }: {
+  file: CaseFile; stats: Stats | null; onDraftSar: () => void; onOpenFlow: () => void; geminiOn: boolean;
 }) {
   const [whyOpen, setWhyOpen] = useState(false);
   const t = riskTint(file.risk_level);
@@ -229,6 +230,7 @@ function CasePanel({ file, stats, onDraftSar, onOpenFlow }: {
             <Button variant="outline">Export case file</Button>
           </a>
         </div>
+        <Explain caseId={file.case_id} geminiOn={geminiOn} />
       </div>
     </div>
   );
@@ -619,7 +621,7 @@ function AboutPanel({ stats, method }: { stats: Stats; method: MethodResponse | 
 /* ------------------------------- shell --------------------------------- */
 
 export function Canvas({
-  mode, wide, onWide, onClose, caseFile, results, cases, stats, method, onOpenCase, onOpenFlow, onDraftSar, footer,
+  mode, wide, onWide, onClose, caseFile, results, cases, stats, method, onOpenCase, onOpenFlow, onDraftSar, footer, geminiOn,
 }: {
   mode: CanvasMode;
   wide: boolean;
@@ -634,6 +636,7 @@ export function Canvas({
   onOpenFlow: () => void;
   onDraftSar: () => void;
   footer: string;
+  geminiOn: boolean;
 }) {
   const title = {
     case: "Case file", flow: "Money flow", table: "Flagged accounts",
@@ -666,7 +669,7 @@ export function Canvas({
       </div>
 
       <div className="scroll" style={{ flex: 1, minHeight: 0, padding: 20, display: "flex", flexDirection: "column", gap: 24 }}>
-        {mode.kind === "case" && caseFile && <CasePanel file={caseFile} stats={stats} onDraftSar={onDraftSar} onOpenFlow={onOpenFlow} />}
+        {mode.kind === "case" && caseFile && <CasePanel file={caseFile} stats={stats} onDraftSar={onDraftSar} onOpenFlow={onOpenFlow} geminiOn={geminiOn} />}
         {mode.kind === "flow" && caseFile && <FlowPanel file={caseFile} />}
         {mode.kind === "table" && <TablePanel results={results} cases={cases} onOpenCase={onOpenCase} />}
         {mode.kind === "method" && (method ? <MethodPanel method={method} /> : <span style={{ color: "var(--ink-2)", fontSize: 13.5 }}>Loading metrics…</span>)}

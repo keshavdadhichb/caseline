@@ -45,9 +45,16 @@ See [DATA.md](DATA.md). <!-- TEAMMATE: citations + licenses -->
 
 ## Disclosure
 
-- **AI tooling:** built with Claude Code (Anthropic); the app itself calls
-  the Anthropic API for planning and SAR drafting. All detection logic is
-  deterministic Python.
+- **AI tooling:** built with Claude Code (Anthropic).
+  - **Anthropic API** (`claude-sonnet-4-6`) — query planning and SAR
+    narrative drafting. Required.
+  - **Google Gemini API** — presentation layer only: the "Explain simply"
+    panel, its illustration (`gemini-3.1-flash-image`), and speech in/out.
+    Optional; the app runs fully without a key and every such feature falls
+    back to a deterministic equivalent. Gemini never plans a query, never
+    drafts a SAR, and never sees or influences a risk score.
+  - **All detection logic is deterministic Python.** No LLM computes,
+    adjusts or ranks a risk score.
 - **Synthetic data:** one injected, clearly-marked smurfing ring — see
   [DATA.md](DATA.md).
 

@@ -27,7 +27,11 @@ from tools.anomaly_model import ANOMALY_TOP_PERCENTILE, N_ESTIMATORS, RANDOM_STA
 from tools.anomaly_model import _baseline as warm_anomaly_baseline
 from tools.case_builder import CaseFile
 from tools.graph_analysis import FAN_IN_MIN_SENDERS, FAN_IN_WINDOW_DAYS
-from tools.narrate import describe_steps, explain_typologies, is_conceptual, prose_plan, prose_results
+from tools import gemini
+from tools.narrate import (
+    describe_steps, explain_case_plainly, explain_typologies, is_conceptual,
+    prose_plan, prose_results,
+)
 from tools.profile_data import profile_data
 from tools.risk_scorer import FORMULA
 from tools.sar_drafter import draft_sar
@@ -64,6 +68,22 @@ CASES: dict[str, dict] = {}
 class QueryRequest(BaseModel):
     query: str
     clarification_answer: str | None = None
+
+
+class ExplainRequest(BaseModel):
+    case_id: str | None = None
+    text: str | None = None
+    question: str | None = None
+    with_image: bool = True
+
+
+class SpeakRequest(BaseModel):
+    text: str
+
+
+class TranscribeRequest(BaseModel):
+    audio_b64: str
+    mime_type: str = "audio/webm"
 
 
 @app.get("/api/health")
@@ -298,3 +318,72 @@ p {{ font-size:13px; max-width:70ch; }}
 IsolationForest seed {RANDOM_STATE} · deterministic</div>
 </body></html>"""
     return HTMLResponse(content=html)
+
+
+# ---------------------------------------------------------------------------
+# Presentation layer (Gemini). Strictly additive: nothing below influences a
+# plan, a score or a decision, and every route degrades to a deterministic
+# answer so the demo is never blocked on an optional dependency.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/presentation")
+def presentation_capabilities() -> dict:
+    """Lets the UI hide controls it cannot fulfil rather than offering a
+    button that fails when the key is absent."""
+    return {"gemini": gemini.is_configured()}
+
+
+@app.post("/api/explain")
+def explain(req: ExplainRequest) -> dict:
+    """Plain-language explanation, with an optional illustration.
+
+    `source` tells the caller which path produced the text so the UI can be
+    honest about it: "gemini" when the model wrote it, "deterministic" when
+    it came from the case's own figures via narrate.explain_case_plainly.
+    """
+    case = CASES.get(req.case_id) if req.case_id else None
+    if req.case_id and case is None:
+        raise HTTPException(404, "unknown case_id")
+
+    payload: dict = case or {"text": req.text or ""}
+    if not case and not req.text:
+        raise HTTPException(422, "provide case_id or text")
+
+    fallback = explain_case_plainly(case) if case else (req.text or "")
+    try:
+        text = gemini.explain_text(payload, req.question)
+        source = "gemini"
+    except gemini.GeminiUnavailable:
+        text, source = fallback, "deterministic"
+
+    image = None
+    if req.with_image:
+        subject = (
+            f"An abstract diagram of a {', '.join(case.get('typologies', [])) or 'suspicious'} "
+            "money-laundering pattern: several small accounts feeding one larger account "
+            "which then forwards the funds onward."
+        ) if case else "An abstract diagram illustrating a financial-crime detection concept."
+        try:
+            image = gemini.explain_image(subject)
+        except gemini.GeminiUnavailable:
+            image = None
+
+    return {"text": text, "source": source, "image_b64": image}
+
+
+@app.post("/api/speak")
+def speak(req: SpeakRequest) -> dict:
+    """Server-side speech. Returns base64 WAV, or asks the UI to fall back to
+    the browser's own synthesiser, which needs no key and works offline."""
+    try:
+        return {"audio_b64": gemini.speak(req.text), "source": "gemini"}
+    except gemini.GeminiUnavailable as exc:
+        return {"audio_b64": None, "source": "browser", "reason": str(exc)}
+
+
+@app.post("/api/transcribe")
+def transcribe(req: TranscribeRequest) -> dict:
+    try:
+        return {"text": gemini.transcribe(req.audio_b64, req.mime_type), "source": "gemini"}
+    except gemini.GeminiUnavailable as exc:
+        raise HTTPException(503, f"speech-to-text unavailable: {exc}") from exc

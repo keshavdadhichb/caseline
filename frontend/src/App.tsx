@@ -14,6 +14,7 @@ import { Landing } from "./components/Landing";
 import { Thread } from "./components/Thread";
 import { Canvas, type CanvasMode } from "./components/Canvas";
 import { useTheme } from "./hooks";
+import { presentation } from "./presentation";
 
 /* The three problem-statement queries, verbatim. */
 const SUGGESTIONS = [
@@ -83,6 +84,8 @@ export default function App() {
   const [method, setMethod] = useState<MethodResponse | null>(null);
   const [lastQuery, setLastQuery] = useState<string>("");
   const [pendingClarify, setPendingClarify] = useState<string | null>(null);
+  // Optional presentation layer; controls stay hidden when it is unavailable.
+  const [geminiOn, setGeminiOn] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inThread = messages.length > 0;
@@ -101,6 +104,7 @@ export default function App() {
   useEffect(() => {
     api.stats().then(setStats).catch(() => { });
     api.method().then(setMethod).catch(() => { });
+    presentation.capabilities().then((c) => setGeminiOn(c.gemini)).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -308,6 +312,7 @@ export default function App() {
             onAbout={() => setCanvas({ kind: "about" })}
             statsLine={stats}
             leaving={leaving}
+            micOn={geminiOn}
           />
         ) : (
           <Thread
@@ -337,6 +342,7 @@ export default function App() {
           onOpenFlow={() => caseFile && setCanvas({ kind: "flow", caseId: caseFile.case_id })}
           onDraftSar={() => caseFile && setCanvas({ kind: "sar", caseId: caseFile.case_id })}
           footer={footer}
+          geminiOn={geminiOn}
         />
       )}
     </div>

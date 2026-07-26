@@ -396,3 +396,35 @@ def _join(items: list[str]) -> str:
     if len(items) == 2:
         return f"{items[0]} and {items[1]}"
     return ", ".join(items[:-1]) + f" and {items[-1]}"
+
+
+def explain_case_plainly(case: dict) -> str:
+    """Deterministic plain-language explanation of one case, built only from
+    that case's own figures. This is the fallback when Gemini is unavailable
+    and it is also the floor on quality: it can never invent a threshold or
+    an amount, so a missing key degrades the prose, never the truth."""
+    typ = [t.replace("_", " ").lower() for t in case.get("typologies", [])]
+    inbound = [t for t in case.get("timeline", []) if t.get("direction") == "in"]
+    outbound = [t for t in case.get("timeline", []) if t.get("direction") == "out"]
+    in_sum = sum(float(t.get("amount", 0)) for t in inbound)
+    out_sum = sum(float(t.get("amount", 0)) for t in outbound)
+    senders = len({t.get("counterparty") for t in inbound})
+
+    parts = [
+        f"Account {case.get('account_id')} was flagged as {case.get('risk_level', 'unknown').lower()} risk"
+        + (f" for {_join(typ)}." if typ else ".")
+    ]
+    if inbound:
+        parts.append(
+            f"It received {len(inbound)} payment{'s' if len(inbound) != 1 else ''} "
+            f"totalling ${in_sum:,.2f}"
+            + (f" from {senders} different account{'s' if senders != 1 else ''}." if senders else ".")
+        )
+    if outbound:
+        parts.append(f"It then sent ${out_sum:,.2f} back out across {len(outbound)} "
+                     f"payment{'s' if len(outbound) != 1 else ''}.")
+    reasons = [str(e.get("reason")) for e in case.get("evidence", []) if e.get("reason")]
+    if reasons:
+        parts.append("In plain terms: " + reasons[0][0].lower() + reasons[0][1:] + ".")
+    parts.append(f"The recommended next step is to {case.get('recommended_action', 'monitor')}.")
+    return " ".join(parts)
