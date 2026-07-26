@@ -36,7 +36,8 @@ export interface TypologyExplainer { name: string; what: string; rule: string; w
 
 export interface SubmitResponse {
   trace_id: string;
-  plan: Plan;
+  /** Null for a conversational reply, which is answered without planning. */
+  plan: Plan | null;
   clarification_needed: string | null;
   prose?: string;
   steps?: NarratedStep[];
@@ -45,6 +46,10 @@ export interface SubmitResponse {
   typologies?: TypologyExplainer[] | null;
   /** Accounts the query named that do not exist in the dataset. */
   unknown_accounts?: string[];
+  /** True when the message was small talk: answered directly, no plan run. */
+  conversational?: boolean;
+  /** Conversational answer accompanying a conceptual question. */
+  conversational_text?: string | null;
   /** The plan is the generic offline fallback, not one built for this query. */
   degraded?: boolean;
   served_from_cache?: boolean;

@@ -47,6 +47,8 @@ export interface Message {
   unknownAccounts?: string[];
   aggregation?: Aggregation | null;
   profile?: Profile | null;
+  /** Case this answer is about, so Explain can use the real evidence. */
+  explainCaseId?: string;
   /** Set when the planner ran no tools at all — a conceptual question. */
   typologies?: TypologyExplainer[];
 }
@@ -161,6 +163,12 @@ export default function App() {
     try {
       const submitted = await api.submit(query, clarificationAnswer);
 
+      // Small talk is answered directly, with no plan and no analysis.
+      if (submitted.conversational) {
+        patch((m) => ({ ...m, thinking: false, prose1: submitted.prose }));
+        return;
+      }
+
       if (submitted.clarification_needed) {
         setPendingClarify(query);
         patch((m) => ({ ...m, thinking: false, clarify: submitted.clarification_needed! }));
@@ -192,7 +200,13 @@ export default function App() {
       // return zero and then claiming nothing met the thresholds — nothing
       // was ever evaluated.
       if (submitted.conceptual) {
-        patch((m) => ({ ...m, typologies: submitted.typologies ?? [] }));
+        patch((m) => ({
+          ...m,
+          // The conversational answer leads; the typology cards stay beneath
+          // it as the authoritative source for the actual thresholds.
+          prose1: submitted.conversational_text || submitted.prose,
+          typologies: submitted.typologies ?? [],
+        }));
         return;
       }
 
@@ -240,6 +254,13 @@ export default function App() {
         return;
       }
 
+      // Only surface a case automatically when it is plausibly the answer: a
+      // named-entity query should open that entity, never a stranger.
+      const named = submitted.plan?.filters.accounts ?? [];
+      const answerCase = named.length
+        ? res.cases.find((c) => named.some((a) => c.account_id === String(a)))
+        : top;
+
       const chips: ChipRef[] = [];
       if (top) {
         chips.push({
@@ -258,14 +279,10 @@ export default function App() {
       chips.push({ kind: "table", label: "Flagged accounts", detail: `${num(res.results.length)} rows · ${typs.size} typologies` });
       chips.push({ kind: "method", label: "Method & performance", detail: "12 / 12 evals passing" });
 
-      patch((m) => ({ ...m, prose2: res.prose ?? undefined, chips }));
+      patch((m) => ({ ...m, prose2: res.prose ?? undefined, chips, explainCaseId: answerCase?.case_id }));
       // Only surface a case automatically when it is plausibly the answer: a
       // named-entity query should open that entity, never a stranger.
-      const named = submitted.plan.filters.accounts ?? [];
-      const answer = named.length
-        ? res.cases.find((c) => named.some((a) => c.account_id === String(a)))
-        : top;
-      if (answer) void openCase(answer.case_id);
+      if (answerCase) void openCase(answerCase.case_id);
     } catch (err) {
       patch((m) => ({
         ...m, thinking: false,
@@ -323,6 +340,7 @@ export default function App() {
             onRetry={() => lastQuery && runQuery(lastQuery)}
             onAnswer={(a) => pendingClarify && runQuery(pendingClarify, a)}
             bottomRef={bottomRef}
+            geminiOn={geminiOn}
           />
         )}
       </main>

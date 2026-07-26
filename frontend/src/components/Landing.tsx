@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { SendIcon } from "./ui";
 import { num } from "../api";
 import { useIntroWipe, usePlaceholderCycle, useTypewriter } from "../hooks";
-import { recordAndTranscribe } from "../presentation";
+import { MicButton } from "./MicButton";
 
 const WORDMARK = "Caseline";
 const HEADLINE = "What should we look into?";
@@ -25,7 +25,6 @@ export function Landing({
 }) {
   const [focused, setFocused] = useState(false);
   const [rippling, setRippling] = useState(false);
-  const [recorder, setRecorder] = useState<{ stop: () => Promise<string> } | null>(null);
   const dotRef = useRef<HTMLSpanElement>(null);
   const intro = useIntroWipe(dotRef);
 
@@ -111,30 +110,7 @@ export function Landing({
                 {statsLine ? `HI-Small · ${num(statsLine.n_txns)} transactions` : "HI-Small"}
               </button>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                {micOn && (
-                  <button
-                    aria-label={recorder ? "Stop recording" : "Dictate a question"}
-                    className="hv-tint"
-                    onClick={async () => {
-                      if (recorder) {
-                        const text = await recorder.stop().catch(() => "");
-                        setRecorder(null);
-                        if (text) onDraft(text);
-                      } else {
-                        try { setRecorder(await recordAndTranscribe()); } catch { /* mic denied */ }
-                      }
-                    }}
-                    style={{
-                      width: 34, height: 34, flex: "none", borderRadius: 999,
-                      border: `1px solid ${recorder ? "var(--violet)" : "var(--line)"}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}>
-                    <span className="dot" style={{
-                      background: recorder ? "var(--violet)" : "var(--ink-3)",
-                      animation: recorder ? "pulseDot 1.4s ease-in-out infinite" : undefined,
-                    }} />
-                  </button>
-                )}
+                <MicButton enabled={micOn} onText={onDraft} />
                 <span style={{ position: "relative", display: "inline-flex" }}>
                 {rippling && (
                   <>

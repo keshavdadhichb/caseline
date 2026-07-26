@@ -9,6 +9,7 @@ the frontend's trace panel can show live progress.
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from contextlib import asynccontextmanager
 from functools import lru_cache
@@ -68,6 +69,10 @@ CASES: dict[str, dict] = {}
 class QueryRequest(BaseModel):
     query: str
     clarification_answer: str | None = None
+
+
+class ChatRequest(BaseModel):
+    message: str
 
 
 class ExplainRequest(BaseModel):
@@ -138,8 +143,63 @@ def method() -> dict:
     return json.loads(METHOD_METRICS_PATH.read_text())
 
 
+# Messages that are plainly not detection queries. Kept deliberately narrow
+# and anchored to the WHOLE string: a greeting is a greeting, but anything
+# carrying an account, an amount, a typology or a question about the data
+# must reach the planner untouched. Matching this list only skips the
+# planner call; it never changes how a real query is handled.
+_SMALL_TALK = re.compile(
+    r"^\s*(hi|hey|hello|yo|sup|good\s+(morning|afternoon|evening)|"
+    r"thanks?|thank\s+you|ta|cheers|ok(ay)?|cool|nice|great|"
+    r"who\s+are\s+you|what\s+can\s+you\s+do|help|what\s+is\s+this)"
+    r"[\s!.?,]*$",
+    re.IGNORECASE,
+)
+
+
+def _small_talk_reply(message: str) -> dict:
+    """Answer conversationally without planning or touching the data. Falls
+    back to a fixed reply so this path works with no key and offline."""
+    facts = None
+    try:
+        st = _dataset_stats()
+        facts = (f"Dataset: {st['dataset']}, {st['n_txns']:,} transactions across "
+                 f"{st['n_accounts']:,} accounts. Detects structuring, rapid movement, "
+                 f"velocity, high-risk amounts, fan-in rings and round-trip cycles.")
+    except Exception:  # noqa: BLE001 - conversational nicety, never fatal
+        pass
+    try:
+        text = gemini.chat(message, facts)
+        source = "gemini"
+    except gemini.GeminiUnavailable:
+        text = ("I look for money-laundering patterns in this transaction dataset. "
+                "Try asking something like \"Find structuring patterns in the last 30 days\" "
+                "or \"Is customer ID 4521 suspicious?\".")
+        source = "deterministic"
+    return {"text": text, "source": source}
+
+
+@app.post("/api/chat")
+def chat(req: ChatRequest) -> dict:
+    return _small_talk_reply(req.message)
+
+
 @app.post("/api/query")
 def submit_query(req: QueryRequest, background_tasks: BackgroundTasks) -> dict:
+    # Small talk never reaches the planner: it needs no plan, and skipping
+    # the call keeps a greeting instant instead of costing a planning round
+    # trip. Detection queries are entirely unaffected.
+    if not req.clarification_answer and _SMALL_TALK.match(req.query):
+        reply = _small_talk_reply(req.query)
+        trace_id = uuid.uuid4().hex[:12]
+        TRACES[trace_id] = {"status": "done", "events": [], "results": [], "cases": []}
+        return {
+            "trace_id": trace_id, "plan": None, "clarification_needed": None,
+            "conversational": True, "prose": reply["text"], "source": reply["source"],
+            "steps": [], "conceptual": False, "unknown_accounts": [],
+            "degraded": False, "served_from_cache": False, "typologies": None,
+        }
+
     plan = plan_query(req.query, req.clarification_answer)
     trace_id = uuid.uuid4().hex[:12]
 
@@ -175,6 +235,12 @@ def submit_query(req: QueryRequest, background_tasks: BackgroundTasks) -> dict:
         # rule modules' own constants.
         "conceptual": is_conceptual(plan),
         "typologies": explain_typologies() if is_conceptual(plan) else None,
+        # A conceptual question gets a conversational answer on top of the
+        # deterministic typology cards; the cards remain the source of truth
+        # for thresholds and are shown regardless.
+        "conversational_text": (
+            _small_talk_reply(req.query)["text"] if is_conceptual(plan) else None
+        ),
         "unknown_accounts": unknown,
         # True when this plan is the generic offline fallback rather than a
         # plan built for this question. The UI must not narrate it as if the

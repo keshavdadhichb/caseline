@@ -7,6 +7,8 @@ import { useSequence } from "../hooks";
 import { Chevron, Collapse, DetailRow, SendIcon } from "./ui";
 import { num, typologyLabel, usd, type NarratedStep } from "../api";
 import type { ChipRef, Message } from "../App";
+import { MicButton } from "./MicButton";
+import { Explain } from "./Explain";
 
 function StepRow({ step }: { step: NarratedStep }) {
   const [open, setOpen] = useState(false);
@@ -70,11 +72,12 @@ function PlanCard({ steps }: { steps: NarratedStep[] }) {
   );
 }
 
-function AgentTurn({ m, onOpenChip, onRetry, onAnswer }: {
+function AgentTurn({ m, onOpenChip, onRetry, onAnswer, geminiOn }: {
   m: Message;
   onOpenChip: (c: ChipRef) => void;
   onRetry: () => void;
   onAnswer: (a: string) => void;
+  geminiOn: boolean;
 }) {
   return (
     <div style={{ display: "flex", gap: 14, animation: "fadeUp10 var(--dur-base) var(--ease-out) both" }}>
@@ -201,6 +204,15 @@ function AgentTurn({ m, onOpenChip, onRetry, onAnswer }: {
           </div>
         )}
 
+        {(m.prose2 || m.prose1) && !m.clarify && !m.error && (
+          <Explain
+            caseId={m.explainCaseId}
+            text={[m.prose1, m.prose2].filter(Boolean).join(" ")}
+            geminiOn={geminiOn}
+            compact
+          />
+        )}
+
         {m.error && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14, animation: "fadeUp10 var(--dur-base) var(--ease-out) both" }}>
             <p style={{ margin: 0, fontSize: 15, lineHeight: 1.62, maxWidth: "62ch" }}>{m.error}</p>
@@ -216,7 +228,7 @@ function AgentTurn({ m, onOpenChip, onRetry, onAnswer }: {
 }
 
 export function Thread({
-  messages, draft, onDraft, onSend, onOpenChip, onRetry, onAnswer, bottomRef,
+  messages, draft, onDraft, onSend, onOpenChip, onRetry, onAnswer, bottomRef, geminiOn,
 }: {
   messages: Message[];
   draft: string;
@@ -226,6 +238,7 @@ export function Thread({
   onRetry: () => void;
   onAnswer: (a: string) => void;
   bottomRef: React.RefObject<HTMLDivElement | null>;
+  geminiOn: boolean;
 }) {
   const [focused, setFocused] = useState(false);
 
@@ -240,7 +253,7 @@ export function Thread({
                   <div style={{ background: "var(--tint)", borderRadius: 14, padding: "10px 16px", fontSize: 15, lineHeight: 1.62, maxWidth: "80%" }}>{m.text}</div>
                 </div>
               ) : (
-                <AgentTurn m={m} onOpenChip={onOpenChip} onRetry={onRetry} onAnswer={onAnswer} />
+                <AgentTurn m={m} onOpenChip={onOpenChip} onRetry={onRetry} onAnswer={onAnswer} geminiOn={geminiOn} />
               )}
             </div>
           ))}
@@ -261,6 +274,7 @@ export function Thread({
               placeholder="Ask a follow-up; Caseline plans the checks"
               style={{ flex: 1, minWidth: 0, border: "none", background: "transparent", fontSize: 15, lineHeight: 1.62, padding: 0, outline: "none" }}
             />
+            <MicButton enabled={geminiOn} onText={onDraft} />
             <button aria-label="Send" onClick={onSend} className="hv-accent"
               style={{ width: 34, height: 34, flex: "none", borderRadius: 999, background: "var(--violet)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <SendIcon />

@@ -103,22 +103,30 @@ def _post(payload: dict) -> dict:
     return r.json()
 
 
-def _first(obj: Any, *keys: str) -> Any:
-    """The interactions response nests output under a couple of shapes
-    depending on modality; probe the documented ones rather than assuming."""
-    if isinstance(obj, dict):
-        for k in keys:
-            if k in obj and obj[k]:
-                return obj[k]
-        for v in obj.values():
-            found = _first(v, *keys)
-            if found:
-                return found
-    elif isinstance(obj, list):
-        for v in obj:
-            found = _first(v, *keys)
-            if found:
-                return found
+def _content_parts(body: dict) -> list[dict]:
+    """The live /interactions response puts the answer in `steps`, not the
+    `output` field the docs describe: steps is a list where the last entry
+    of type "model_output" carries `content`, a list of typed parts. The
+    earlier "thought" step also carries a large `signature` string, which a
+    naive "find the longest string" probe would return instead of the
+    image, so parts are read by position and type rather than by search."""
+    parts: list[dict] = []
+    for step in body.get("steps") or []:
+        if step.get("type") == "model_output":
+            parts.extend(step.get("content") or [])
+    return parts
+
+
+def _text_of(body: dict) -> str | None:
+    chunks = [p.get("text", "") for p in _content_parts(body) if p.get("type") == "text"]
+    joined = " ".join(c for c in chunks if c).strip()
+    return joined or None
+
+
+def _image_of(body: dict) -> str | None:
+    for p in _content_parts(body):
+        if p.get("data") and p.get("type") in (None, "image", "output_image"):
+            return str(p["data"])
     return None
 
 
@@ -136,12 +144,9 @@ def explain_text(payload: dict, question: str | None = None) -> str:
             "model": TEXT_MODEL,
             "input": [{"type": "text", "text": f"{EXPLAIN_SYSTEM}\n\n{ask}\n\n{json.dumps(payload, indent=2, default=str)}"}],
         })
-        text = _first(body, "output_text", "text")
-        if isinstance(text, list):
-            text = " ".join(str(t) for t in text)
-        if not text or not str(text).strip():
+        text = _text_of(body)
+        if not text:
             raise GeminiUnavailable("no text in gemini response")
-        text = str(text).strip()
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         cached.write_text(text)
         return text
@@ -161,14 +166,12 @@ def explain_image(subject: str) -> str:
             "input": [{"type": "text", "text": f"{subject}\n\n{DESIGN_DIRECTION}"}],
             "response_format": {"type": "image", "mime_type": "image/jpeg", "aspect_ratio": "16:9"},
         })
-        data = _first(body, "output_image", "data", "inlineData")
-        if isinstance(data, dict):
-            data = data.get("data")
+        data = _image_of(body)
         if not data:
             raise GeminiUnavailable("no image in gemini response")
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        cached.write_text(str(data))
-        return str(data)
+        cached.write_text(data)
+        return data
     except GeminiUnavailable:
         if cached.exists():
             return cached.read_text()
@@ -198,12 +201,10 @@ def speak(text: str) -> str:
             "response_format": {"type": "audio"},
             "generation_config": {"speech_config": [{"voice": TTS_VOICE}]},
         })
-        data = _first(body, "output_audio", "data", "inlineData")
-        if isinstance(data, dict):
-            data = data.get("data")
+        data = _image_of(body)  # audio arrives in the same typed-part slot
         if not data:
             raise GeminiUnavailable("no audio in gemini response")
-        wav = _pcm_to_wav(base64.b64decode(str(data)))
+        wav = _pcm_to_wav(base64.b64decode(data))
         encoded = base64.b64encode(wav).decode()
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         cached.write_text(encoded)
@@ -223,9 +224,40 @@ def transcribe(audio_b64: str, mime_type: str = "audio/webm") -> str:
             {"type": "audio", "data": audio_b64, "mime_type": mime_type},
         ],
     })
-    text = _first(body, "output_text", "text")
-    if isinstance(text, list):
-        text = " ".join(str(t) for t in text)
-    if not text or not str(text).strip():
+    text = _text_of(body)
+    if not text:
         raise GeminiUnavailable("no transcript in gemini response")
-    return str(text).strip()
+    return text
+
+
+# --------------------------------------------------------------------------
+# conversational
+# --------------------------------------------------------------------------
+
+CHAT_SYSTEM = (
+    "You are the assistant inside Caseline, a tool that finds money-laundering "
+    "patterns in bank transaction data. You are handling a message that is NOT a "
+    "detection query: a greeting, a thank-you, a question about how the product "
+    "works, or general anti-money-laundering background.\n\n"
+    "Rules:\n"
+    "- Be brief and warm. One or two short paragraphs, no headings, no markdown.\n"
+    "- NEVER state a finding, a count, a risk score or an account id. You have not "
+    "run any analysis and must not imply that you have.\n"
+    "- If the user seems to want an actual analysis, say what they could ask "
+    "instead, for example 'Find structuring patterns in the last 30 days'.\n"
+    "- You may explain AML concepts generally, but if asked for Caseline's exact "
+    "thresholds, say they are shown in the About panel rather than guessing."
+)
+
+
+def chat(message: str, context: str | None = None) -> str:
+    """Answer a non-detection message. Deliberately has no access to results:
+    it cannot report a finding, only converse and point at the real query."""
+    prompt = CHAT_SYSTEM + f"\n\nUser message: {message}"
+    if context:
+        prompt += f"\n\nProduct facts you may use verbatim:\n{context}"
+    body = _post({"model": TEXT_MODEL, "input": [{"type": "text", "text": prompt}]})
+    text = _text_of(body)
+    if not text:
+        raise GeminiUnavailable("no chat text in gemini response")
+    return text
