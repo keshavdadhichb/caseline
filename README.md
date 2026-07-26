@@ -3,6 +3,11 @@
 **Query-driven AI agent that detects money-laundering patterns in transaction
 data — and shows its reasoning.**
 
+**[Open the styled docs page](docs/index.html)** — same content as below, laid
+out in Caseline's own light-theme design system rather than plain Markdown
+(GitHub strips custom CSS from rendered READMEs, so this file stays plain and
+the real one lives in `docs/`). Setup, GIF, and everything else that follows.
+
 <!-- TODO: hero GIF of a query being answered with the trace streaming.
      No screen-recording capability here — record one from the running app
      (query 3, "Is customer ID 4521 suspicious?" is the best 15-second clip:
@@ -22,6 +27,45 @@ prose, which cites only evidence present in the underlying case.
   -> 10-node ring, $254,317 gathered from 9 accounts, 85% moved out in 48h
   -> recommended action: report · SAR narrative drafted
 ```
+
+## Run it
+
+```bash
+make setup      # python venv + npm install
+make backend    # http://localhost:8000
+make frontend   # http://localhost:5173
+```
+
+Copy `.env.example` to `.env` and fill in your keys. The 200k-row sample is
+already committed; `make data` only rebuilds it from `data/raw` if you want to.
+
+## What runs without each key
+
+| | `ANTHROPIC_API_KEY` (required) | `GEMINI_API_KEY` (optional) |
+|---|---|---|
+| Detection (rules, anomaly, graph, scoring) | Unaffected — deterministic Python either way | Unaffected — never imported in `agent/` or any detection tool |
+| The 3 canonical demo queries | Unaffected — pre-cached, replay instantly | Unaffected |
+| Novel queries | Degrades to "could not be planned" instead of a fake sweep | Unaffected |
+| SAR narratives | Falls back to a deterministic template from the case's own facts | Unaffected |
+| "Explain simply" | Unaffected | Falls back to a real summary built from the case's evidence, no model prose |
+| Read aloud | Unaffected | Falls back to the browser's built-in speech synthesis |
+| Illustration / voice input | Unaffected | No fallback — simply doesn't render / doesn't appear |
+
+## Live demo
+
+Not yet deployed — both hosts need an interactive login from the deploying
+machine. Backend: Render, from the committed `render.yaml` Blueprint (an
+in-memory trace store and a model fit once at startup rule out a serverless
+host). Frontend: Vercel, via `frontend/vercel.json`'s rewrite to the backend.
+
+## Docker
+
+```bash
+docker compose up --build
+```
+
+Backend on `:8000`, frontend (nginx, proxying `/api/*`) on `:8080`. The
+closest local reproduction of the hosted deploy.
 
 ## Baseline vs. Caseline
 
@@ -121,43 +165,6 @@ risk_level (tier) = HIGH if a STRONG rule fired AND corroborated by a second det
                      method (graph or anomaly-high); MEDIUM if exactly one method fired
                      (or only a weak rule); LOW if anomaly-high alone
 ```
-
-## Run it
-
-### Local
-
-```bash
-make setup      # python venv + npm install
-make data       # rebuilds data/sample from data/raw (optional — the sample is committed)
-make backend    # http://localhost:8000
-make frontend   # http://localhost:5173
-```
-
-Copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` (required — query
-planning and SAR drafting). `GEMINI_API_KEY` is optional; see Disclosure.
-
-### Docker
-
-```bash
-docker compose up --build
-```
-
-Brings up both services — backend on `:8000`, frontend (nginx, proxying
-`/api/*` to the backend) on `:8080`. Requires the same `.env` at the repo
-root. This is also the closest local reproduction of the hosted deploy, and
-what `evals/smoke.py` is run against in CI-equivalent verification.
-
-### Hosted
-
-Backend deploys as a Render web service from the committed `render.yaml`
-Blueprint (it holds an in-memory trace store and a model fit once at
-startup, so it needs a host that runs a persistent process, not a
-serverless function). Frontend deploys to Vercel; `frontend/vercel.json`
-rewrites `/api/*` to the Render backend so the browser sees one origin.
-
-<!-- TODO: live URL once both are deployed (interactive login to Render and
-     Vercel from the deploying machine, so not something automatable from
-     here) -->
 
 ## Testing & evals
 
