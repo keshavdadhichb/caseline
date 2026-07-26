@@ -1,6 +1,6 @@
 PY := .venv/bin/python
 
-.PHONY: setup data backend frontend test test-live eval
+.PHONY: setup data backend frontend test test-live eval verify verify-backend
 
 setup:
 	python3 -m venv .venv
@@ -23,6 +23,12 @@ test:
 
 test-live:
 	$(PY) -m pytest backend/tests -q -m live
+
+verify:
+	$(PY) evals/smoke.py http://localhost:5173
+
+verify-backend:
+	$(PY) evals/smoke.py http://localhost:8000
 
 eval:
 	$(PY) evals/run.py
