@@ -412,13 +412,15 @@ cp .env.example .env</pre>
     <div class="sec-label">03 &middot; Deploy</div>
     <h2 class="sec-title">Live demo &amp; Docker</h2>
     <div class="cta-row">
-      <div class="cta-card live">
-        <div class="cta-title"><span class="dot off" style="display:inline-block;width:6px;height:6px;border-radius:999px;"></span>Live demo</div>
-        <div class="cta-body">Backend deploys as a Render web service from the committed
-          <code>render.yaml</code> Blueprint; frontend deploys to Vercel via
-          <code>frontend/vercel.json</code>. Not yet deployed &mdash; both need an interactive login
-          from the deploying machine. This card will carry the link once that's done.</div>
-        <span class="cta-btn ghost">awaiting deploy</span>
+      <div class="cta-card">
+        <div class="cta-title"><span class="dot on" style="display:inline-block;width:6px;height:6px;border-radius:999px;"></span>Live demo</div>
+        <div class="cta-body">Backend on Render, frontend on Vercel, wired by a same-origin rewrite.
+          Free-tier caveat, honestly: the backend's plan cache is empty on a fresh instance (no
+          persistent disk on the free plan), so every query the instance hasn't seen yet costs a live
+          10&ndash;20s planner call rather than replaying from cache, and free-tier instances have
+          shown occasional 502s under back-to-back load in testing. Fine for clicking around; the
+          in-person demo still runs locally.</div>
+        <a class="cta-btn" href="https://frontend-two-rho-4kpyvvuh8c.vercel.app" target="_blank" rel="noreferrer">open the live app</a>
       </div>
       <div class="cta-card">
         <div class="cta-title">Docker</div>

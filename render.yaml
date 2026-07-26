@@ -22,7 +22,13 @@ services:
       - key: GEMINI_API_KEY
         sync: false # optional — presentation layer degrades gracefully without it
       - key: CORS_ALLOW_ORIGINS
-        value: https://caseline.vercel.app # update to match the actual Vercel domain after first deploy
+        # The real deployed domain (frontend-two-rho-4kpyvvuh8c.vercel.app) —
+        # not that this is load-bearing: the browser only ever talks to the
+        # Vercel domain itself, which rewrites /api/* to this service
+        # server-side, so it's same-origin from the browser's perspective
+        # either way. This just makes direct-to-backend requests (curl,
+        # testing, a future second frontend) explicit rather than implicit.
+        value: https://frontend-two-rho-4kpyvvuh8c.vercel.app
     # No persistent disk: Render's free plan doesn't support one (paid plans
     # only), so .cache/plans and .cache/gemini reset on every restart —
     # every query just re-runs live and re-populates the cache, which is

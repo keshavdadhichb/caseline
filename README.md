@@ -53,10 +53,18 @@ already committed; `make data` only rebuilds it from `data/raw` if you want to.
 
 ## Live demo
 
-Not yet deployed — both hosts need an interactive login from the deploying
-machine. Backend: Render, from the committed `render.yaml` Blueprint (an
+**[frontend-two-rho-4kpyvvuh8c.vercel.app](https://frontend-two-rho-4kpyvvuh8c.vercel.app)**
+— frontend on Vercel, backend on Render (`render.yaml` Blueprint; an
 in-memory trace store and a model fit once at startup rule out a serverless
-host). Frontend: Vercel, via `frontend/vercel.json`'s rewrite to the backend.
+host), wired by a same-origin rewrite so the browser never talks to Render
+directly.
+
+Free-tier caveat, honestly: no persistent disk means the backend's plan
+cache starts empty, so a query the instance hasn't seen yet costs a live
+10–20s planner call instead of an instant cache replay, and testing turned
+up occasional 502s under back-to-back load. Fine for browsing; the in-person
+demo still runs locally, which is what the whole cache/offline-fallback
+design in `agent/planner.py` is actually for.
 
 ## Docker
 
