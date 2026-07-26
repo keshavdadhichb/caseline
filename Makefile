@@ -1,6 +1,6 @@
 PY := .venv/bin/python
 
-.PHONY: setup data backend frontend test test-live eval verify verify-backend
+.PHONY: setup data backend frontend test test-live eval verify verify-backend docker
 
 setup:
 	python3 -m venv .venv
@@ -33,3 +33,6 @@ verify-backend:
 eval:
 	$(PY) evals/run.py
 	$(PY) evals/baseline.py
+
+docker:
+	docker compose up --build

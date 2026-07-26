@@ -145,8 +145,17 @@ def run(base: str) -> int:
         check("SAR names the account", ring_case["account_id"] in (full.get("narrative") or ""))
 
         exp = c.get(f"/api/case/{ring_case['case_id']}/export")
-        check("export returns a document", exp.status_code == 200, f"{len(exp.text):,} bytes")
-        check("export includes the SAR + formula", "SAR narrative" in exp.text and "0.45" in exp.text)
+        check("export returns a document", exp.status_code == 200, f"{len(exp.content):,} bytes")
+        # The export is a real PDF (xhtml2pdf), not HTML, so its bytes are a
+        # compressed content stream — text-searching exp.text for "SAR
+        # narrative" the way the old HTML export allowed no longer means
+        # anything. Checking the magic bytes and content-type instead; the
+        # narrative and formula's actual correctness is already asserted
+        # against the source JSON above ("SAR narrative drafted", "SAR is
+        # 150-250 words", "SAR names the account"), which is what the PDF is
+        # rendered from.
+        check("export is a valid PDF", exp.content[:5] == b"%PDF-" and
+              "application/pdf" in exp.headers.get("content-type", ""))
 
     print("\n" + "=" * 60)
     if failed:
