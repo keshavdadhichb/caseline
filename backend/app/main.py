@@ -27,7 +27,7 @@ from tools.anomaly_model import ANOMALY_TOP_PERCENTILE, N_ESTIMATORS, RANDOM_STA
 from tools.anomaly_model import _baseline as warm_anomaly_baseline
 from tools.case_builder import CaseFile
 from tools.graph_analysis import FAN_IN_MIN_SENDERS, FAN_IN_WINDOW_DAYS
-from tools.narrate import describe_steps, prose_plan, prose_results
+from tools.narrate import describe_steps, explain_typologies, is_conceptual, prose_plan, prose_results
 from tools.profile_data import profile_data
 from tools.risk_scorer import FORMULA
 from tools.sar_drafter import draft_sar
@@ -139,6 +139,13 @@ def submit_query(req: QueryRequest, background_tasks: BackgroundTasks) -> dict:
         "clarification_needed": None,
         "prose": prose_plan(plan),
         "steps": describe_steps(plan),
+        # The planner can decide a question needs no data work at all
+        # ("what is structuring?"). That is NOT the same as a run that
+        # executed and found nothing, and must not be reported as one —
+        # no threshold was ever evaluated. Answer it instead, from the
+        # rule modules' own constants.
+        "conceptual": is_conceptual(plan),
+        "typologies": explain_typologies() if is_conceptual(plan) else None,
     }
 
 
@@ -178,8 +185,11 @@ def get_results(trace_id: str) -> dict:
         "results": t["results"],
         "cases": t["cases"],
         # Counts come straight off the result set — see tools/narrate.py.
-        "prose": prose_results(t["results"], t["cases"]),
+        # A conceptual question ran nothing, so it gets no results sentence
+        # at all rather than a false "nothing met the thresholds".
+        "prose": None if is_conceptual(t.get("plan") or {}) else prose_results(t["results"], t["cases"]),
         "steps": describe_steps(t.get("plan") or {}, t["events"]),
+        "conceptual": is_conceptual(t.get("plan") or {}),
     }
 
 

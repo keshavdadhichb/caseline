@@ -28,7 +28,8 @@ from tools.risk_scorer import FORMULA
 from tools.rules_engine import (
     HIGH_RISK_AMOUNT_SIGMA, MIN_HISTORY_FOR_BASELINE, NEAR_THRESHOLD_HIGH,
     RAPID_MOVEMENT_MIN_INBOUND, RAPID_MOVEMENT_MIN_SOURCES, RAPID_MOVEMENT_RATIO,
-    STRUCTURING_CONSOLIDATION_RATIO, STRUCTURING_HIGH_LOW, STRUCTURING_HIGH_MIN_COUNT,
+    STRUCTURING_CONSOLIDATION_RATIO, STRUCTURING_CONSOLIDATION_WINDOW_DAYS,
+    STRUCTURING_HIGH_LOW, STRUCTURING_HIGH_MIN_COUNT,
     STRUCTURING_MEDIUM_LOW, STRUCTURING_MEDIUM_MIN_COUNT, STRUCTURING_WINDOW_DAYS,
     VELOCITY_SIGMA,
 )
@@ -180,6 +181,14 @@ def describe_steps(plan: dict, events: list[dict] | None = None) -> list[dict]:
     return out
 
 
+def is_conceptual(plan: dict) -> bool:
+    """True when the planner decided the question needs no data work at all
+    (every tool skipped) — e.g. "what is structuring?". Distinct from a run
+    that executed and found nothing: no threshold was ever evaluated, so
+    claiming "no accounts met the thresholds" would be false."""
+    return not plan.get("steps")
+
+
 def prose_plan(plan: dict) -> str:
     """The sentence shown as soon as the plan exists, before any result —
     what was scoped and what was deliberately left out."""
@@ -187,12 +196,19 @@ def prose_plan(plan: dict) -> str:
     ran = [s["tool"] for s in plan.get("steps", [])]
     skipped = [s["tool"] for s in plan.get("skipped", [])]
 
+    if is_conceptual(plan):
+        return (
+            "That's a question about how detection works rather than a query over the data, "
+            "so I didn't run any analysis — no transactions were scanned and no thresholds "
+            "were evaluated."
+        )
+
     scope_bits = []
     if filters.get("accounts"):
         scope_bits.append(f"scoped the data to {', '.join(str(a) for a in filters['accounts'])}")
     elif filters.get("window_days"):
         scope_bits.append(f"scoped the data to the last {filters['window_days']} days")
-    else:
+    elif "filter_data" in ran:
         scope_bits.append("worked across the full sample")
     if filters.get("min_amount"):
         scope_bits.append(f"kept transactions at or above ${filters['min_amount']:,.0f}")
@@ -215,6 +231,75 @@ def _skip_reason(plan: dict, skipped: list[str]) -> str:
             reason = step["reason"].strip()
             return reason[0].lower() + reason[1:] if reason else "not needed for this question."
     return "not needed for this question."
+
+
+def explain_typologies() -> list[dict]:
+    """Plain-language definition of every typology the system can detect,
+    with the ACTUAL threshold each one uses. Assembled from the rule
+    modules' own constants so the explanation can never drift from the
+    code — if a threshold changes, this text changes with it."""
+    return [
+        {
+            "name": "STRUCTURING_HIGH",
+            "what": "Deliberately breaking a large sum into deposits that each stay under the "
+                    f"${NEAR_THRESHOLD_HIGH:,.0f} reporting threshold, then moving the pooled money on.",
+            "rule": f"{STRUCTURING_HIGH_MIN_COUNT}+ deposits between ${STRUCTURING_HIGH_LOW:,.0f} and "
+                    f"${NEAR_THRESHOLD_HIGH:,.0f} into one account within {STRUCTURING_WINDOW_DAYS} days, "
+                    f"AND at least {STRUCTURING_CONSOLIDATION_RATIO:.0%} of it sent back out within "
+                    f"{STRUCTURING_CONSOLIDATION_WINDOW_DAYS} days.",
+            "why": "The onward transfer is what separates laundering from an ordinary cash business — "
+                   "a shop banks its takings and leaves them; a mule account gathers and forwards.",
+        },
+        {
+            "name": "STRUCTURING_MEDIUM",
+            "what": "The same sub-threshold deposit pattern, but without a confirmed onward transfer.",
+            "rule": f"{STRUCTURING_MEDIUM_MIN_COUNT}+ transactions between ${STRUCTURING_MEDIUM_LOW:,.0f} and "
+                    f"${NEAR_THRESHOLD_HIGH:,.0f} within {STRUCTURING_WINDOW_DAYS} days, either side of the account.",
+            "why": "A weaker indicator on its own — plenty of legitimate businesses look like this — "
+                   "so it can put an account in front of an analyst but never escalates it by itself.",
+        },
+        {
+            "name": "RAPID_MOVEMENT",
+            "what": "Money arriving from several sources and leaving again almost immediately — a pass-through "
+                    "or funnel account.",
+            "rule": f"{RAPID_MOVEMENT_RATIO:.0%}+ of inbound funds sent out within 48 hours, on at least "
+                    f"${RAPID_MOVEMENT_MIN_INBOUND:,.0f} gathered from {RAPID_MOVEMENT_MIN_SOURCES}+ distinct senders.",
+            "why": "Requiring more than one sender is what distinguishes a funnel from ordinary "
+                   "two-party settlement, where fast in-and-out is normal.",
+        },
+        {
+            "name": "VELOCITY",
+            "what": "A sudden burst of activity far outside what this account normally does.",
+            "rule": f"Peak transactions-per-hour more than {VELOCITY_SIGMA:.0f} standard deviations above the "
+                    f"account's own baseline, once it has {MIN_HISTORY_FOR_BASELINE}+ prior transactions.",
+            "why": "The history minimum matters: a standard deviation from three transactions is noise, "
+                   "not a baseline.",
+        },
+        {
+            "name": "HIGH_RISK_AMOUNT",
+            "what": "A single transaction wildly out of character for the account.",
+            "rule": f"One amount more than {HIGH_RISK_AMOUNT_SIGMA:.0f} standard deviations above the account's own "
+                    f"history, with {MIN_HISTORY_FOR_BASELINE}+ prior transactions.",
+            "why": "Same reasoning as velocity — the account is compared against itself, not the population.",
+        },
+        {
+            "name": "FAN_IN_RING",
+            "what": "Many accounts feeding one collector account, which then forwards the pooled money on — "
+                    "the classic smurfing ring.",
+            "rule": f"{FAN_IN_MIN_SENDERS}+ distinct senders into one account within {FAN_IN_WINDOW_DAYS} days, "
+                    f"with {FAN_IN_CONSOLIDATION_RATIO:.0%}+ of the gathered total moving onward.",
+            "why": "Found on the transaction graph rather than in any single account's numbers, which is why "
+                   "it corroborates the rules rather than repeating them.",
+        },
+        {
+            "name": "CYCLE",
+            "what": "Money that travels through several accounts and returns near where it started — layering "
+                    "to obscure its origin.",
+            "rule": f"A closed loop of 3 to {CYCLE_MAX_HOPS} hops on the transfer graph.",
+            "why": "Two-party back-and-forth is excluded deliberately — that's just two people who both pay "
+                   "each other, which is extremely common and not laundering.",
+        },
+    ]
 
 
 def prose_results(results: list[dict], cases: list[dict]) -> str:

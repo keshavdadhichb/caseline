@@ -32,12 +32,17 @@ export interface NarratedStep {
   returned: string;
 }
 
+export interface TypologyExplainer { name: string; what: string; rule: string; why: string }
+
 export interface SubmitResponse {
   trace_id: string;
   plan: Plan;
   clarification_needed: string | null;
   prose?: string;
   steps?: NarratedStep[];
+  /** True when the planner decided the question needs no data work at all. */
+  conceptual?: boolean;
+  typologies?: TypologyExplainer[] | null;
 }
 
 export interface TraceEvent {
@@ -78,8 +83,9 @@ export interface CaseFile {
 export interface ResultsResponse {
   results: RiskRecord[];
   cases: CaseFile[];
-  prose?: string;
+  prose?: string | null;
   steps?: NarratedStep[];
+  conceptual?: boolean;
 }
 
 export interface Stats {

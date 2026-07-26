@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api, num, usd,
   type CaseFile, type MethodResponse, type NarratedStep, type RiskRecord, type Stats,
+  type TypologyExplainer,
 } from "./api";
 import { Sidebar } from "./components/Sidebar";
 import { Landing } from "./components/Landing";
@@ -39,6 +40,8 @@ export interface Message {
   clarify?: string;
   empty?: boolean;
   error?: string;
+  /** Set when the planner ran no tools at all — a conceptual question. */
+  typologies?: TypologyExplainer[];
 }
 
 export interface Investigation {
@@ -134,6 +137,15 @@ export default function App() {
       setPendingClarify(null);
       patch((m) => ({ ...m, thinking: false, prose1: submitted.prose, steps: submitted.steps ?? [] }));
 
+      // A conceptual question ("what is structuring?") runs nothing. Answer
+      // it from the real rule constants instead of polling a run that will
+      // return zero and then claiming nothing met the thresholds — nothing
+      // was ever evaluated.
+      if (submitted.conceptual) {
+        patch((m) => ({ ...m, typologies: submitted.typologies ?? [] }));
+        return;
+      }
+
       // Poll the trace so steps tick over pending -> running -> done live.
       const traceId = submitted.trace_id;
       let status = "running";
@@ -188,7 +200,7 @@ export default function App() {
       chips.push({ kind: "table", label: "Flagged accounts", detail: `${num(res.results.length)} rows · ${typs.size} typologies` });
       chips.push({ kind: "method", label: "Method & performance", detail: "12 / 12 evals passing" });
 
-      patch((m) => ({ ...m, prose2: res.prose, chips }));
+      patch((m) => ({ ...m, prose2: res.prose ?? undefined, chips }));
       if (top) void openCase(top.case_id);
     } catch (err) {
       patch((m) => ({

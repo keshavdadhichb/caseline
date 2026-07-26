@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { Chevron, Collapse, DetailRow, SendIcon } from "./ui";
-import type { NarratedStep } from "../api";
+import { typologyLabel, type NarratedStep } from "../api";
 import type { ChipRef, Message } from "../App";
 
 function StepRow({ step }: { step: NarratedStep }) {
@@ -112,6 +112,25 @@ function AgentTurn({ m, onOpenChip, onRetry, onAnswer }: {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {m.typologies && m.typologies.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, animation: "fadeUp 300ms var(--ease) both" }}>
+            {m.typologies.map((t) => (
+              <div key={t.name} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+                <span style={{ fontSize: 16, fontWeight: 500, letterSpacing: "-0.01em", lineHeight: 1.45 }}>{typologyLabel(t.name)}</span>
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, maxWidth: "62ch" }}>{t.what}</p>
+                <div style={{ display: "flex", gap: 12, fontSize: 13.5, lineHeight: 1.5 }}>
+                  <span className="label" style={{ width: 76, flex: "none", paddingTop: 3, marginBottom: 0 }}>Rule</span>
+                  <span className="mono" style={{ fontSize: 13, color: "var(--ink)", maxWidth: "56ch" }}>{t.rule}</span>
+                </div>
+                <div style={{ display: "flex", gap: 12, fontSize: 13.5, lineHeight: 1.5 }}>
+                  <span className="label" style={{ width: 76, flex: "none", paddingTop: 3, marginBottom: 0 }}>Why</span>
+                  <span style={{ color: "var(--muted)", maxWidth: "56ch" }}>{t.why}</span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
