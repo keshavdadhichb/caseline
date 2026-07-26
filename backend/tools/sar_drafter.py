@@ -12,6 +12,10 @@ import hashlib
 import json
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import anthropic
 
 from tools.case_builder import CaseFile
