@@ -1,0 +1,37 @@
+# Render Blueprint — commit-as-infra deploy for the backend.
+# https://render.com/docs/blueprint-spec
+#
+# The backend is a persistent FastAPI process (in-memory trace store, an
+# IsolationForest fit once at startup and cached in-process, BackgroundTasks
+# for async execution) — none of that survives a serverless/stateless host,
+# which is why this runs on Render's persistent web service rather than
+# Vercel functions. The frontend deploys separately to Vercel and reaches
+# this service through a rewrite (see frontend/vercel.json), so the URL
+# below must match that rewrite's destination if the service name changes.
+services:
+  - type: web
+    name: caseline-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false # set in the Render dashboard; never committed
+      - key: GEMINI_API_KEY
+        sync: false # optional — presentation layer degrades gracefully without it
+      - key: CORS_ALLOW_ORIGINS
+        value: https://caseline.vercel.app # update to match the actual Vercel domain after first deploy
+    # No persistent disk: Render's free plan doesn't support one (paid plans
+    # only), so .cache/plans and .cache/gemini reset on every restart —
+    # every query just re-runs live and re-populates the cache, which is
+    # the same as a genuinely fresh clone, so this is a redeploy-warmup
+    # cost, not a functional gap.
+    #
+    # Free-plan tradeoff worth knowing: Render spins the service down after
+    # 15 minutes with no traffic and takes ~1 minute to wake on the next
+    # request. Fine for judges clicking a link before/after the demo; the
+    # actual live demo should still run locally per CLAUDE.md's wifi-off
+    # plan. Upgrade `plan:` to `starter` ($7/mo) to remove the spin-down
+    # and add a persistent disk if that matters later.

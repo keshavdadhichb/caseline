@@ -1,0 +1,14 @@
+.git
+.venv
+node_modules
+frontend/dist
+frontend/node_modules
+backend/__pycache__
+backend/**/__pycache__
+.cache
+.pytest_cache
+data/raw
+data/eval_splits
+*.pyc
+.env
+audit/audit_raw.json

@@ -1,0 +1,40 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      # docker-compose's own network, not a real browser origin, so no CORS
+      # entry is needed for it; the frontend container reaches this over the
+      # Docker network via nginx's reverse proxy, never directly from a browser.
+      - CORS_ALLOW_ORIGINS=http://localhost:8080
+    volumes:
+      # Named volumes: pre-warmed plan/gemini caches survive `docker compose
+      # down` and a rebuild, matching the "wifi off" resilience story from
+      # CLAUDE.md — a redeploy must not cold-start the demo queries.
+      - plan-cache:/app/.cache/plans
+      - gemini-cache:/app/.cache/gemini
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  plan-cache:
+  gemini-cache:

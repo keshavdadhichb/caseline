@@ -9,6 +9,7 @@ the frontend's trace panel can show live progress.
 from __future__ import annotations
 
 import json
+import os
 import re
 import uuid
 from contextlib import asynccontextmanager
@@ -57,7 +58,15 @@ app = FastAPI(title="Caseline", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    # Every real deployment path (Vite dev proxy, the nginx container, the
+    # Vercel rewrite) puts the frontend and this API on the same origin from
+    # the browser's point of view, so CORS is a fallback for direct API
+    # access (curl, a future separately-hosted frontend), not the primary
+    # path. Configurable via env rather than hardcoded so the same image
+    # works in dev, Docker Compose, and hosted without a rebuild.
+    allow_origins=[
+        o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:5173").split(",") if o.strip()
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
