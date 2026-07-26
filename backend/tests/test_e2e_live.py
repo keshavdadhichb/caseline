@@ -76,7 +76,7 @@ def test_the_injected_ring_produces_a_complete_case_file_with_sar(live_server):
 
     record = next(r for r in results["results"] if r["account_id"] == "4521")
     assert record["risk_level"] == "HIGH"
-    assert {"STRUCTURING", "RAPID_MOVEMENT", "FAN_IN_RING"} <= (
+    assert {"STRUCTURING_HIGH", "RAPID_MOVEMENT", "FAN_IN_RING"} <= (
         set(record["rules_fired"]) | set(record["graph_fired"])
     )
 

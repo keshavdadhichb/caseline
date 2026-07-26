@@ -19,28 +19,20 @@ import json
 import time
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import anthropic
 
 MODEL = "claude-sonnet-4-6"
-LIVE_TIMEOUT_SECONDS = 20.0
+LIVE_TIMEOUT_SECONDS = 8.0
 CACHE_DIR = Path(__file__).resolve().parents[2] / ".cache" / "plans"
 
 TOOL_CATALOG = [
     {
         "name": "filter_data",
         "description": "Date/account/amount/channel scoping. Almost always the first step.",
-    },
-    {
-        "name": "aggregate_data",
-        "description": (
-            "Plain counting over accounts with NO risk judgement: how many "
-            "transactions each account made inside an amount band, keeping "
-            "accounts at or above a minimum count. Use for factual "
-            "count/threshold questions like 'which customers made 10+ "
-            "transactions under $10,000' — these are NOT typology questions, "
-            "so do not use rules_engine for them. Params: min_count, "
-            "max_amount, min_amount."
-        ),
     },
     {
         "name": "profile_data",
@@ -111,14 +103,7 @@ made 10+ transactions under $10,000" needs filter_data + feature_engine + rules_
 NOTHING else; anomaly_model and graph_analysis add nothing to a pure threshold aggregation \
 and must be skipped.
 - window_days is relative to the dataset's own latest transaction timestamp, not today's \
-date — the data is historical (September 2022). Only set it when the query implies a RELATIVE \
-time scope ("the last 30 days").
-- If the query names explicit calendar dates ("between September 10 and September 17, 2022"), \
-set date_from and date_to as YYYY-MM-DD and leave window_days null. Never convert an explicit \
-date range into a relative window; they are not the same scope.
-- A factual counting question ("which customers made 10+ transactions under $10,000") uses \
-aggregate_data, NOT rules_engine: the typology rules answer a different question and would \
-return the wrong set.
+date — the data is historical (September 2022). Only set it when the query implies a time scope.
 - If an account is named directly (e.g. "customer ID 4521"), put it in filters.accounts.
 - If the query is genuinely ambiguous in a way that changes what you'd compute (a \
 time-dependent question with no window given, or "suspicious" with no typology or entity \
@@ -144,14 +129,10 @@ def _plan_tool_schema() -> dict:
                     "type": "object",
                     "properties": {
                         "window_days": {"type": ["integer", "null"]},
-                        "date_from": {"type": ["string", "null"],
-                                      "description": "explicit start date YYYY-MM-DD, when the query names one"},
-                        "date_to": {"type": ["string", "null"],
-                                    "description": "explicit end date YYYY-MM-DD, inclusive"},
                         "min_amount": {"type": ["number", "null"]},
                         "accounts": {"type": ["array", "null"], "items": {"type": "string"}},
                     },
-                    "required": ["window_days", "date_from", "date_to", "min_amount", "accounts"],
+                    "required": ["window_days", "min_amount", "accounts"],
                 },
                 "typologies": {
                     "type": "array",
@@ -201,7 +182,7 @@ def _fallback_plan(reason: str) -> dict:
     instead of erroring out."""
     return {
         "intent": "general_review",
-        "filters": {"window_days": 30, "date_from": None, "date_to": None, "min_amount": None, "accounts": None},
+        "filters": {"window_days": 30, "min_amount": None, "accounts": None},
         "typologies": ["structuring", "velocity", "rapid_movement", "high_risk_amount"],
         "steps": [
             {"tool": "filter_data", "params": {"window_days": 30},
@@ -214,7 +195,6 @@ def _fallback_plan(reason: str) -> dict:
         ],
         "skipped": [
             {"tool": "profile_data", "reason": "targeted detection already covers this"},
-            {"tool": "aggregate_data", "reason": "no explicit count threshold was requested"},
         ],
         "clarification_needed": None,
         "_offline_fallback": True,
