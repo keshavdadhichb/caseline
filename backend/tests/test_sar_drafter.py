@@ -13,9 +13,9 @@ def _sample_case() -> CaseFile:
         account_id="4521",
         risk_level="HIGH",
         score=1.0,
-        typologies=["STRUCTURING", "RAPID_MOVEMENT", "FAN_IN_RING"],
+        typologies=["STRUCTURING_HIGH", "RAPID_MOVEMENT", "FAN_IN_RING"],
         evidence=[
-            {"typology": "STRUCTURING", "source": "rules_engine", "count": 27, "window_days": 7},
+            {"typology": "STRUCTURING_HIGH", "source": "rules_engine", "count": 27, "window_days": 7},
             {"typology": "FAN_IN_RING", "source": "graph_analysis", "sender_count": 9,
              "total_in": 254317.25, "total_out": 216169.66, "consolidation_ratio": 0.85},
         ],
@@ -27,7 +27,7 @@ def _sample_case() -> CaseFile:
         ],
         ring={"nodes": ["4521", "RING-M01"], "edges": []},
         recommended_action="report",
-        explanation="HIGH (1.00) — rules: RAPID_MOVEMENT, STRUCTURING; graph: FAN_IN_RING",
+        explanation="HIGH (1.00) — rules: RAPID_MOVEMENT, STRUCTURING_HIGH; graph: FAN_IN_RING",
     )
 
 
