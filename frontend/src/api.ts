@@ -3,7 +3,7 @@
    only, never the design mock's placeholder figures. */
 
 const BASE = "/api";
-
+  
 export interface PlanStep { tool: string; params: Record<string, unknown>; reason: string }
 export interface PlanSkip { tool: string; reason: string }
 export interface Plan {
