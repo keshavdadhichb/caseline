@@ -143,18 +143,45 @@ def method() -> dict:
     return json.loads(METHOD_METRICS_PATH.read_text())
 
 
-# Messages that are plainly not detection queries. Kept deliberately narrow
-# and anchored to the WHOLE string: a greeting is a greeting, but anything
-# carrying an account, an amount, a typology or a question about the data
-# must reach the planner untouched. Matching this list only skips the
-# planner call; it never changes how a real query is handled.
-_SMALL_TALK = re.compile(
-    r"^\s*(hi|hey|hello|yo|sup|good\s+(morning|afternoon|evening)|"
-    r"thanks?|thank\s+you|ta|cheers|ok(ay)?|cool|nice|great|"
-    r"who\s+are\s+you|what\s+can\s+you\s+do|help|what\s+is\s+this)"
-    r"[\s!.?,]*$",
+# Small talk is matched by a broad pattern plus a hard negative guard,
+# rather than a literal word list. "who are u" slipped through an earlier
+# exact-match list, reached the planner, timed out, and produced a
+# 7,985-account sweep in answer to a greeting.
+#
+# The guard is what makes breadth safe: if a message mentions anything from
+# the detection vocabulary it is NEVER treated as small talk, however
+# chatty it looks. So "hi, find structuring" still reaches the planner.
+_DETECTION_WORDS = re.compile(
+    r"\b(account|accounts|customer|customers|transaction|transactions|txn|"
+    r"structuring|smurf\w*|launder\w*|velocity|anomal\w*|ring|rings|cycle|"
+    r"suspicious|flag\w*|risk|typolog\w*|deposit\w*|amount|threshold|"
+    r"pattern|patterns|counterpart\w*|sar|case|cases|score|scores|"
+    r"\$|\d{3,})\b",
     re.IGNORECASE,
 )
+
+_SMALL_TALK = re.compile(
+    r"^\s*(?:"
+    r"h+i+|h+e+y+|hell?o+|yo+|sup|wh?a+t'?s?\s*up|greetings|"
+    r"good\s*(?:morning|afternoon|evening|day)|"
+    r"th(?:an)?[kx]s?\s*(?:you|u)?|ty|cheers|ta|much\s+appreciated|"
+    r"(?:so\s+)?who\s+(?:are|r)\s*(?:you|u)|"
+    r"wh?at'?s?\s+(?:are|r|is|s)?\s*(?:you|u|this|thi?s)|"
+    r"wh?at\s+(?:do|can)\s+(?:you|u)\s+do|"
+    r"how\s+(?:do|does)\s+(?:you|u|this|it)\s+work|"
+    r"help|about|info|hm+|ok(?:ay)?|k|cool|nice|great|awesome|"
+    r"got\s+it|makes\s+sense|i\s+see|bye|goodbye|see\s+ya"
+    r")[\s!.?,]*$",
+    re.IGNORECASE,
+)
+
+
+def is_small_talk(message: str) -> bool:
+    """True only when the message is conversational AND mentions nothing from
+    the detection vocabulary."""
+    if _DETECTION_WORDS.search(message):
+        return False
+    return bool(_SMALL_TALK.match(message))
 
 
 def _small_talk_reply(message: str) -> dict:
@@ -189,7 +216,7 @@ def submit_query(req: QueryRequest, background_tasks: BackgroundTasks) -> dict:
     # Small talk never reaches the planner: it needs no plan, and skipping
     # the call keeps a greeting instant instead of costing a planning round
     # trip. Detection queries are entirely unaffected.
-    if not req.clarification_answer and _SMALL_TALK.match(req.query):
+    if not req.clarification_answer and is_small_talk(req.query):
         reply = _small_talk_reply(req.query)
         trace_id = uuid.uuid4().hex[:12]
         TRACES[trace_id] = {"status": "done", "events": [], "results": [], "cases": []}
@@ -206,6 +233,22 @@ def submit_query(req: QueryRequest, background_tasks: BackgroundTasks) -> dict:
     if plan.get("clarification_needed"):
         TRACES[trace_id] = {"status": "done", "events": [], "results": [], "cases": []}
         return {"trace_id": trace_id, "plan": plan, "clarification_needed": plan["clarification_needed"]}
+
+    # A degraded plan is the generic fallback: the planner never understood
+    # this question, so the sweep it produces answers nothing. Asking a
+    # greeting used to return 7,985 accounts this way. Hand it to the
+    # conversational path instead, which either answers it properly or says
+    # it could not be planned.
+    if plan.get("_offline_fallback") and not req.clarification_answer:
+        reply = _small_talk_reply(req.query)
+        trace_id = uuid.uuid4().hex[:12]
+        TRACES[trace_id] = {"status": "done", "events": [], "results": [], "cases": []}
+        return {
+            "trace_id": trace_id, "plan": None, "clarification_needed": None,
+            "conversational": True, "prose": reply["text"], "source": reply["source"],
+            "steps": [], "conceptual": False, "unknown_accounts": [],
+            "degraded": True, "served_from_cache": False, "typologies": None,
+        }
 
     # An entity the dataset has never seen cannot be answered by scanning the
     # book: report it plainly instead of running a sweep and surfacing some
