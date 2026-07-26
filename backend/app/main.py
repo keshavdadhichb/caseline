@@ -171,6 +171,8 @@ def _execute(trace_id: str, plan: dict) -> None:
         outcome = run_plan(df, plan, trace["events"])
         trace["results"] = outcome["results"]
         trace["cases"] = outcome["cases"]
+        trace["profile"] = outcome.get("profile")
+        trace["aggregation"] = outcome.get("aggregation")
         trace["status"] = "done"
         for case in outcome["cases"]:
             CASES[case["case_id"]] = case
@@ -202,7 +204,10 @@ def get_results(trace_id: str) -> dict:
         # Counts come straight off the result set — see tools/narrate.py.
         # A conceptual question ran nothing, so it gets no results sentence
         # at all rather than a false "nothing met the thresholds".
-        "prose": None if is_conceptual(t.get("plan") or {}) else prose_results(t["results"], t["cases"]),
+        "prose": None if is_conceptual(t.get("plan") or {}) else prose_results(
+            t["results"], t["cases"], t.get("profile"), t.get("aggregation")),
+        "profile": t.get("profile"),
+        "aggregation": t.get("aggregation"),
         "steps": describe_steps(t.get("plan") or {}, t["events"]),
         "conceptual": is_conceptual(t.get("plan") or {}),
     }

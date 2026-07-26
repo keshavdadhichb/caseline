@@ -5,7 +5,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api, num, usd,
-  type CaseFile, type MethodResponse, type NarratedStep, type RiskRecord, type Stats,
+  type Aggregation, type CaseFile, type MethodResponse, type NarratedStep, type Profile,
+  type RiskRecord, type Stats,
   type TypologyExplainer,
 } from "./api";
 import { Sidebar } from "./components/Sidebar";
@@ -43,6 +44,8 @@ export interface Message {
   error?: string;
   notice?: string;
   unknownAccounts?: string[];
+  aggregation?: Aggregation | null;
+  profile?: Profile | null;
   /** Set when the planner ran no tools at all — a conceptual question. */
   typologies?: TypologyExplainer[];
 }
@@ -220,7 +223,15 @@ export default function App() {
       const top = res.cases.find((c) => c.risk_level === "HIGH") ?? res.cases[0] ?? null;
       setInvestigations((p) => p.map((i) => (i.id === invId ? { ...i, topRisk: top?.risk_level ?? "LOW" } : i)));
 
-      if (res.results.length === 0) {
+      if (res.aggregation || res.profile) {
+        // Answered by a count or a profile: show that answer, not the
+        // detection-threshold empty state.
+        patch((m) => ({
+          ...m, prose2: res.prose ?? undefined,
+          aggregation: res.aggregation, profile: res.results.length ? null : res.profile,
+        }));
+        if (res.results.length === 0) return;
+      } else if (res.results.length === 0) {
         patch((m) => ({ ...m, empty: true }));
         return;
       }

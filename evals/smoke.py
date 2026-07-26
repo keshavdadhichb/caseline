@@ -96,7 +96,18 @@ def run(base: str) -> int:
         check("under the 10s query budget", elapsed < 10.0, f"{elapsed:.1f}s")
 
         res = c.get(f"/api/query/{tid}/results").json()
-        check("results returned", len(res["results"]) > 0, f"{len(res['results'])} scored, {len(res['cases'])} cases")
+        # A query answers EITHER with risk records or with a factual answer
+        # (a count or a dataset profile). Query 2 is a counting question, so
+        # demanding risk records for it would be demanding the wrong answer.
+        answered = (
+            len(res["results"]) > 0
+            or res.get("aggregation") is not None
+            or res.get("profile") is not None
+        )
+        detail = (f"{len(res['results'])} scored, {len(res['cases'])} cases"
+                  if res["results"] else
+                  f"count answer: {(res.get('aggregation') or {}).get('matched', 'profile')}")
+        check("query produced an answer", answered, detail)
         check("result prose present", bool(res.get("prose")), (res.get("prose") or "")[:70] + "…")
         check("every result explains itself", all(x["explanation"] for x in res["results"]))
         check("every case has a recommended action",

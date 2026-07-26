@@ -40,6 +40,7 @@ from tools.rules_engine import (
 STEP_LABELS = {
     "filter_data": "Filter the transaction set",
     "profile_data": "Profile the dataset",
+    "aggregate_data": "Count matching transactions",
     "feature_engine": "Build account features",
     "rules_engine": "Apply typology rules",
     "anomaly_model": "Score anomalies",
@@ -55,6 +56,7 @@ PROSE_NOUNS = {
     "rules_engine": "the typology rules",
     "anomaly_model": "anomaly scoring",
     "graph_analysis": "network analysis",
+    "aggregate_data": "a transaction count",
 }
 
 
@@ -64,8 +66,11 @@ def step_label(tool: str, filters: dict | None = None) -> str:
     if tool == "filter_data" and filters:
         window = filters.get("window_days")
         accounts = filters.get("accounts")
+        d_from, d_to = filters.get("date_from"), filters.get("date_to")
         if accounts:
             return f"Filter to {', '.join(str(a) for a in accounts[:2])}"
+        if d_from or d_to:
+            return f"Filter to {d_from or 'the start'} through {d_to or 'the end'}"
         if window:
             return f"Filter to the last {window} days"
     return STEP_LABELS.get(tool, tool)
@@ -78,7 +83,10 @@ def _chose(tool: str, plan: dict) -> str:
 
     if tool == "filter_data":
         parts = []
-        if filters.get("window_days"):
+        if filters.get("date_from") or filters.get("date_to"):
+            parts.append(f"{filters.get('date_from') or 'the earliest record'} through "
+                         f"{filters.get('date_to') or 'the latest record'}, inclusive")
+        elif filters.get("window_days"):
             parts.append(f"the last {filters['window_days']} days of the dataset window")
         if filters.get("accounts"):
             parts.append(f"accounts {', '.join(str(a) for a in filters['accounts'])}")
@@ -88,6 +96,10 @@ def _chose(tool: str, plan: dict) -> str:
 
     if tool == "profile_data":
         return "row counts, account counts, date range, total volume and channel mix"
+
+    if tool == "aggregate_data":
+        return ("a plain count of transactions per account inside the requested amount band; "
+                "no typology rule and no risk judgement is applied")
 
     if tool == "feature_engine":
         return f"{len(FEATURE_COLUMNS) - 1} per-account features, including rolling counts, amount z-scores, velocity and rapid in-to-out ratio"
@@ -206,6 +218,9 @@ def prose_plan(plan: dict) -> str:
     scope_bits = []
     if filters.get("accounts"):
         scope_bits.append(f"scoped the data to {', '.join(str(a) for a in filters['accounts'])}")
+    elif filters.get("date_from") or filters.get("date_to"):
+        scope_bits.append(f"scoped the data to {filters.get('date_from') or 'the start'} "
+                          f"through {filters.get('date_to') or 'the end'}")
     elif filters.get("window_days"):
         scope_bits.append(f"scoped the data to the last {filters['window_days']} days")
     elif "filter_data" in ran:
@@ -302,9 +317,42 @@ def explain_typologies() -> list[dict]:
     ]
 
 
-def prose_results(results: list[dict], cases: list[dict]) -> str:
+def prose_results(results: list[dict], cases: list[dict],
+                  profile: dict | None = None, aggregation: dict | None = None) -> str:
     """The sentence shown once the run finishes — what was actually found.
     Counts come straight from the result set; nothing is estimated."""
+    # A question can be answered by a count or a profile rather than by risk
+    # flags. Reporting "nothing met the thresholds" when the answer was in
+    # fact computed would be false, so those answers are stated first.
+    if aggregation is not None:
+        c = aggregation.get("criteria") or {}
+        bits = []
+        if c.get("min_count"):
+            bits.append(f"{c['min_count']}+ transactions")
+        if c.get("max_amount"):
+            bits.append(f"under ${c['max_amount']:,.0f}")
+        if c.get("min_amount"):
+            bits.append(f"at or above ${c['min_amount']:,.0f}")
+        criteria = " ".join(bits) if bits else "the requested criteria"
+        n = aggregation.get("matched", 0)
+        sentence = f"{n:,} account{'s' if n != 1 else ''} match {criteria}."
+        rows = aggregation.get("rows") or []
+        if rows:
+            top = rows[0]
+            sentence += (f" The highest is {top['account_id']} with {top['count']:,} such transactions"
+                         f" totalling ${top['total_amount']:,.2f}.")
+        if aggregation.get("truncated"):
+            sentence += f" The table shows the top {len(rows):,} by count."
+        return sentence
+
+    if profile is not None and not results:
+        return (
+            f"{profile['n_txns']:,} transactions across {profile['n_accounts']:,} accounts, "
+            f"spanning {profile['date_range'][0][:10]} to {profile['date_range'][1][:10]}, "
+            f"totalling ${profile['total_volume']:,.2f} with a median transaction of "
+            f"${profile['median_amount']:,.2f}."
+        )
+
     if not results:
         return "No accounts met the detection thresholds for this question."
 

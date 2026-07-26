@@ -13,6 +13,7 @@ from typing import Any
 
 import pandas as pd
 
+from tools.aggregate_data import aggregate_data
 from tools.anomaly_model import anomaly_model
 from tools.case_builder import build_indexes, case_builder
 from tools.feature_engine import feature_engine
@@ -31,7 +32,7 @@ from tools.rules_engine import rules_engine
 # order is therefore unsafe; always execute in this canonical order instead
 # (still using each step's own "reason" text for trace/UI display).
 CANONICAL_ORDER = [
-    "filter_data", "profile_data", "feature_engine",
+    "filter_data", "profile_data", "aggregate_data", "feature_engine",
     "rules_engine", "anomaly_model", "graph_analysis", "risk_scorer",
 ]
 
@@ -49,6 +50,7 @@ def run_plan(df: pd.DataFrame, plan: dict, events: list[dict]) -> dict:
     state: dict[str, Any] = {
         "df": df,
         "profile": None,
+        "aggregation": None,
         "features": None,
         "rule_flags": [],
         "graph_flags": [],
@@ -107,6 +109,12 @@ def run_plan(df: pd.DataFrame, plan: dict, events: list[dict]) -> dict:
     return {
         "results": [asdict(r) for r in risk_records],
         "cases": [asdict(c) for c in cases],
+        # Some questions are answered by a profile or a count rather than by
+        # risk flags. Carrying those through means the UI can report what was
+        # actually computed instead of falling back to "nothing met the
+        # thresholds", which would be false.
+        "profile": state["profile"],
+        "aggregation": state["aggregation"],
     }
 
 
@@ -118,6 +126,8 @@ def _run_step(tool: str, plan: dict, state: dict) -> str:
             window_days=filters.get("window_days"),
             min_amount=filters.get("min_amount"),
             accounts=filters.get("accounts"),
+            date_from=filters.get("date_from"),
+            date_to=filters.get("date_to"),
         )
         return f"{len(state['df']):,} transactions in scope"
 
@@ -125,6 +135,17 @@ def _run_step(tool: str, plan: dict, state: dict) -> str:
         state["profile"] = profile_data(state["df"])
         p = state["profile"]
         return f"{p['n_txns']:,} txns, {p['n_accounts']:,} accounts, ${p['total_volume']:,.0f} volume"
+
+    if tool == "aggregate_data":
+        params = next((s.get("params") or {} for s in plan.get("steps", []) if s["tool"] == "aggregate_data"), {})
+        state["aggregation"] = aggregate_data(
+            state["df"],
+            min_count=params.get("min_count"),
+            max_amount=params.get("max_amount"),
+            min_amount=params.get("min_amount"),
+        )
+        a = state["aggregation"]
+        return f"{a['matched']:,} accounts met the count threshold"
 
     if tool == "feature_engine":
         state["features"] = feature_engine(state["df"])

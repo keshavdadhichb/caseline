@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { useSequence } from "../hooks";
 import { Chevron, Collapse, DetailRow, SendIcon } from "./ui";
-import { typologyLabel, type NarratedStep } from "../api";
+import { num, typologyLabel, usd, type NarratedStep } from "../api";
 import type { ChipRef, Message } from "../App";
 
 function StepRow({ step }: { step: NarratedStep }) {
@@ -102,6 +102,49 @@ function AgentTurn({ m, onOpenChip, onRetry, onAnswer }: {
         {m.steps && m.steps.length > 0 && <PlanCard steps={m.steps} />}
 
         {m.prose2 && <p style={{ margin: 0, fontSize: 15, lineHeight: 1.62, maxWidth: "62ch", animation: "fadeUp10 var(--dur-base) var(--ease-out) both" }}>{m.prose2}</p>}
+
+        {m.profile && (
+          <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, padding: 16, display: "flex", flexDirection: "column", gap: 10, animation: "fadeUp10 var(--dur-base) var(--ease-out) both" }}>
+            <div className="label" style={{ marginBottom: 0 }}>Dataset profile</div>
+            {([
+              ["Transactions", num(m.profile.n_txns)],
+              ["Accounts", num(m.profile.n_accounts)],
+              ["Window", `${m.profile.date_range[0].slice(0, 10)} to ${m.profile.date_range[1].slice(0, 10)}`],
+              ["Total volume", usd(m.profile.total_volume, 0)],
+              ["Median transaction", usd(m.profile.median_amount)],
+            ] as [string, string][]).map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13.5, lineHeight: 1.5 }}>
+                <span style={{ color: "var(--ink-2)" }}>{k}</span>
+                <span className="mono" style={{ fontSize: 13, color: "var(--ink)" }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {m.aggregation && m.aggregation.rows.length > 0 && (
+          <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden", animation: "fadeUp10 var(--dur-base) var(--ease-out) both" }}>
+            <div className="label" style={{ padding: "14px 16px 10px", marginBottom: 0 }}>
+              Matching accounts · {num(m.aggregation.matched)} total
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 84px 120px", gap: 8, padding: "0 16px 8px" }}>
+              <span className="label" style={{ marginBottom: 0 }}>Account</span>
+              <span className="label" style={{ marginBottom: 0, textAlign: "right" }}>Txns</span>
+              <span className="label" style={{ marginBottom: 0, textAlign: "right" }}>Total</span>
+            </div>
+            {m.aggregation.rows.slice(0, 10).map((r) => (
+              <div key={r.account_id} style={{ display: "grid", gridTemplateColumns: "1fr 84px 120px", gap: 8, padding: "8px 16px", borderTop: "1px solid var(--line)", fontSize: 13 }}>
+                <span className="mono" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.account_id}</span>
+                <span className="mono" style={{ textAlign: "right" }}>{num(r.count)}</span>
+                <span className="mono" style={{ textAlign: "right" }}>{usd(r.total_amount, 0)}</span>
+              </div>
+            ))}
+            {m.aggregation.matched > 10 && (
+              <div style={{ padding: "10px 16px", borderTop: "1px solid var(--line)", fontSize: 12.5, color: "var(--ink-3)" }}>
+                Showing the 10 highest by count, of {num(m.aggregation.matched)} matching accounts.
+              </div>
+            )}
+          </div>
+        )}
 
         {m.chips && m.chips.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, animation: "fadeUp10 var(--dur-base) var(--ease-out) both", animationDelay: "120ms" }}>

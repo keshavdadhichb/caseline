@@ -14,11 +14,14 @@
   expect_skipped_include: [anomaly_model, graph_analysis]
   expect_result_typology_include: [STRUCTURING_MEDIUM]
 
+# q02 is a factual COUNT question, not a typology question. It must use
+# aggregate_data: the structuring rules answer a different question (a
+# narrower $9,000-$10,000 band, a 3-transaction minimum, a 7-day window) and
+# returned 132 accounts where the true answer is 1,002.
 - id: q02
   query: "Which customers made 10+ transactions under $10,000?"
-  expect_steps_include: [filter_data, feature_engine, rules_engine]
+  expect_steps_include: [aggregate_data]
   expect_skipped_include: [anomaly_model, graph_analysis]
-  expect_result_typology_include: [STRUCTURING_MEDIUM]
 
 - id: q03
   query: "Is customer ID 4521 suspicious?"

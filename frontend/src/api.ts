@@ -8,7 +8,7 @@ export interface PlanStep { tool: string; params: Record<string, unknown>; reaso
 export interface PlanSkip { tool: string; reason: string }
 export interface Plan {
   intent: string;
-  filters: { window_days: number | null; min_amount: number | null; accounts: string[] | null };
+  filters: { window_days: number | null; date_from: string | null; date_to: string | null; min_amount: number | null; accounts: string[] | null };
   typologies: string[];
   steps: PlanStep[];
   skipped: PlanSkip[];
@@ -85,12 +85,28 @@ export interface CaseFile {
   narrative: string | null;
 }
 
+export interface AggregationRow { account_id: string; count: number; total_amount: number }
+export interface Aggregation {
+  criteria: { min_count: number | null; max_amount: number | null; min_amount: number | null };
+  matched: number;
+  rows: AggregationRow[];
+  truncated: boolean;
+}
+export interface Profile {
+  n_txns: number; n_accounts: number; date_range: [string, string];
+  total_volume: number; median_amount: number; channel_breakdown: Record<string, number>;
+}
+
 export interface ResultsResponse {
   results: RiskRecord[];
   cases: CaseFile[];
   prose?: string | null;
   steps?: NarratedStep[];
   conceptual?: boolean;
+  /** Set when the question was answered by a count or a profile rather than
+   *  by risk flags. */
+  aggregation?: Aggregation | null;
+  profile?: Profile | null;
 }
 
 export interface Stats {

@@ -93,6 +93,7 @@ def test_plan_schema_names_match_actual_tool_catalog():
     expected_modules = {
         "filter_data": "tools.filter_data",
         "profile_data": "tools.profile_data",
+        "aggregate_data": "tools.aggregate_data",
         "feature_engine": "tools.feature_engine",
         "rules_engine": "tools.rules_engine",
         "anomaly_model": "tools.anomaly_model",
