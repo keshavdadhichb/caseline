@@ -7,17 +7,20 @@ import type { CSSProperties, ReactNode } from "react";
 export function Chevron({ open, size = 8 }: { open: boolean; size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 8 8" fill="none" aria-hidden="true"
-      style={{ flex: "none", transform: `rotate(${open ? 90 : 0}deg)`, transition: "transform 200ms var(--ease)" }}>
-      <path d="M2.5 1 6 4 2.5 7" stroke="var(--faint)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      style={{ flex: "none", transform: `rotate(${open ? 90 : 0}deg)`, transition: "transform var(--dur-fast) var(--ease-out)" }}>
+      <path d="M2.5 1 6 4 2.5 7" stroke="var(--ink-3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-/** The design's grid-template-rows 0fr→1fr collapse. */
+/** Grid-template-rows 0fr -> 1fr expansion (never max-height). Opening runs
+ *  at --dur-base, closing at --dur-fast, and revealed children fade up 6px
+ *  on a 40ms stagger. Both behaviours live in index.css so the timing is
+ *  declared once. */
 export function Collapse({ open, children }: { open: boolean; children: ReactNode }) {
   return (
-    <div className="collapse" style={{ gridTemplateRows: open ? "1fr" : "0fr" }}>
-      <div>{children}</div>
+    <div className="collapse" data-open={open}>
+      <div><div className="stagger">{children}</div></div>
     </div>
   );
 }
@@ -38,7 +41,7 @@ export function DetailRow({ k, v, keyWidth = 96, mono = false }:
     <div style={{ display: "flex", gap: 12, fontSize: 13.5, lineHeight: 1.5 }}>
       <span className="label" style={{ width: keyWidth, flex: "none", paddingTop: 3 }}>{k}</span>
       <span style={{
-        color: mono ? "var(--ink)" : "var(--muted)",
+        color: mono ? "var(--ink)" : "var(--ink-2)",
         fontFamily: mono ? "var(--mono)" : undefined,
         fontSize: mono ? 13 : undefined,
         maxWidth: "56ch", minWidth: 0, overflowWrap: "anywhere",
@@ -62,9 +65,9 @@ export function Button({ variant = "ghost", onClick, children, style, ...rest }:
     fontSize: 13.5, fontWeight: 500, display: "inline-flex", alignItems: "center",
   };
   const variants: Record<string, CSSProperties> = {
-    accent: { background: "var(--accent)", color: "#FFFFFF" },
-    outline: { border: "1px solid var(--border)", background: "transparent", color: "var(--ink)" },
-    ghost: { color: "var(--muted)" },
+    accent: { background: "var(--violet)", color: "var(--on-violet)" },
+    outline: { border: "1px solid var(--line)", background: "transparent", color: "var(--ink)" },
+    ghost: { color: "var(--ink-2)" },
   };
   return (
     <button
@@ -80,8 +83,8 @@ export function Button({ variant = "ghost", onClick, children, style, ...rest }:
 
 export function SendIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path d="M2.5 7h9M8.5 3.5 12 7l-3.5 3.5" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style={{ color: "var(--on-violet)" }}>
+      <path d="M2.5 7h9M8.5 3.5 12 7l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -90,7 +93,7 @@ export function Skeleton({ w, h = 13, style }: { w: number | string; h?: number;
   return (
     <span style={{
       display: "inline-block", width: w, height: h, borderRadius: 6,
-      background: "var(--tint)", animation: "dotsPulse 1.4s ease-in-out infinite", ...style,
+      background: "var(--tint)", ...style,
     }} />
   );
 }

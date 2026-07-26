@@ -163,7 +163,7 @@ export const typologyLabel = (t: string) =>
 /** The design colours risk with two tints only — high (rose) and settled
  *  (green); medium/low reuse the neutral surface tint. */
 export function riskTint(level: string) {
-  if (level === "HIGH") return { bg: "var(--risk-high-bg)", fg: "var(--risk-high-fg)", dot: "var(--risk-high-dot)" };
-  if (level === "MEDIUM") return { bg: "var(--tint)", fg: "var(--muted)", dot: "var(--border-strong)" };
-  return { bg: "var(--risk-ok-bg)", fg: "var(--risk-ok-fg)", dot: "var(--risk-ok-dot)" };
+  if (level === "HIGH") return { bg: "var(--sev-high-bg)", fg: "var(--sev-high-fg)", dot: "var(--sev-high)" };
+  if (level === "MEDIUM") return { bg: "var(--sev-med-bg)", fg: "var(--sev-med-fg)", dot: "var(--sev-med)" };
+  return { bg: "var(--sev-ok-bg)", fg: "var(--sev-ok-fg)", dot: "var(--sev-ok)" };
 }

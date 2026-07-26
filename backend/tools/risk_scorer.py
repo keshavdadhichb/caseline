@@ -152,9 +152,9 @@ def risk_scorer(
             anomaly_component=round(a_component, 3),
             anomaly_only=not rules_fired and not graph_fired,
             explanation=(
-                f"{risk_level} ({score:.2f}) — " + "; ".join(fired_summary)
+                f"{risk_level} ({score:.2f}): " + "; ".join(fired_summary)
                 if fired_summary else
-                f"{risk_level} ({score:.2f}) — no individual signal met threshold"
+                f"{risk_level} ({score:.2f}): no individual signal met threshold"
             ),
         ))
 

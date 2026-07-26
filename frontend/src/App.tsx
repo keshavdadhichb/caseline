@@ -12,6 +12,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Landing } from "./components/Landing";
 import { Thread } from "./components/Thread";
 import { Canvas, type CanvasMode } from "./components/Canvas";
+import { useTheme } from "./hooks";
 
 /* The three problem-statement queries, verbatim. */
 const SUGGESTIONS = [
@@ -55,7 +56,12 @@ let seq = 0;
 const nextId = () => `m${++seq}`;
 
 export default function App() {
+  const [theme, toggleTheme] = useTheme();
   const [sideOpen, setSideOpen] = useState(true);
+  // Remembers the rail state the user chose, so auto-collapsing for a canvas
+  // can restore it rather than overwrite it.
+  const userSideOpen = useRef(true);
+  const [leaving, setLeaving] = useState(false);
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [investigations, setInvestigations] = useState<Investigation[]>([]);
@@ -75,6 +81,13 @@ export default function App() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inThread = messages.length > 0;
+
+  /* The canvas needs the width, so the rail collapses while one is open and
+     returns to whatever the user had chosen when it closes. */
+  useEffect(() => {
+    if (canvas) setSideOpen(false);
+    else setSideOpen(userSideOpen.current);
+  }, [canvas]);
 
   useEffect(() => {
     api.stats().then(setStats).catch(() => { });
@@ -109,6 +122,12 @@ export default function App() {
   }, []);
 
   const runQuery = useCallback(async (query: string, clarificationAnswer?: string) => {
+    // Landing fades up and out before the thread mounts.
+    if (messages.length === 0) {
+      setLeaving(true);
+      await new Promise((r) => setTimeout(r, 300));
+      setLeaving(false);
+    }
     setDraft("");
     setLastQuery(query);
     const invId = activeInv ?? `inv${Date.now()}`;
@@ -208,7 +227,7 @@ export default function App() {
         error: `${(err as Error).message}. The backend may not be running — start it with \`make backend\`.`,
       }));
     }
-  }, [activeInv, openCase]);
+  }, [activeInv, openCase, messages.length]);
 
   const onChip = useCallback((c: ChipRef) => {
     if (c.kind === "case" && c.caseId) void openCase(c.caseId, "case");
@@ -224,16 +243,18 @@ export default function App() {
   const sidebarFooter = stats ? `HI-Small · seed ${stats.model.seed} · About` : "About";
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--bg)" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--page)" }}>
       <Sidebar
         open={sideOpen}
-        onToggle={() => setSideOpen((o) => !o)}
+        onToggle={() => setSideOpen((o) => { userSideOpen.current = !o; return !o; })}
         items={investigations}
         activeId={activeInv}
         onSelect={setActiveInv}
         onNew={() => { setMessages([]); setActiveInv(null); setCanvas(null); setResults([]); setCases([]); }}
         onAbout={() => setCanvas({ kind: "about" })}
         footer={sidebarFooter}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", position: "relative" }}>
@@ -245,6 +266,7 @@ export default function App() {
             onPick={(q) => runQuery(q)}
             onAbout={() => setCanvas({ kind: "about" })}
             statsLine={stats}
+            leaving={leaving}
           />
         ) : (
           <Thread

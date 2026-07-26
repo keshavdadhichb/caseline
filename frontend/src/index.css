@@ -1,49 +1,93 @@
-/* Caseline — design tokens transcribed verbatim from the Claude Design
-   project (Caseline.dc.html). Values are the design's own literals; nothing
-   is approximated. Fonts are self-hosted (@fontsource) rather than pulled
-   from Google Fonts so the demo renders identically with wifi off.
+/* Caseline — theme + motion system.
+   Light is the default and keeps the warm paper ground from the Claude
+   Design source. Dark is a designed theme, not an inversion: its own
+   palette, its own tint set, and a lightened violet that carries dark text.
 
-   Tailwind is intentionally not used here: the design specifies exact
-   inline styles throughout, and matching it 1:1 in plain CSS + inline
-   style objects avoids a translation layer that could drift from it. */
+   Tailwind is intentionally not used: the design specifies exact values,
+   and matching them 1:1 in plain CSS avoids a translation layer. */
 
-@import "@fontsource/dm-sans/400.css";
-@import "@fontsource/dm-sans/500.css";
-@import "@fontsource/dm-mono/400.css";
-@import "@fontsource/dm-mono/500.css";
+@import "@fontsource/montserrat/400.css";
+@import "@fontsource/montserrat/500.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
 
 :root {
-  --sans: 'DM Sans', sans-serif;
-  --mono: 'DM Mono', monospace;
+  --sans: 'Montserrat', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  --bg: #F2F0EA;
-  --side-bg: #E7E4DB;
-  --side-border: #DBD7CC;
+  /* ---- motion tokens: nothing outside this set ---- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms;
+  --dur-fast: 200ms;
+  --dur-base: 300ms;
+  --dur-slow: 420ms;
+  --stagger: 40ms;
+
+  /* ---- light (default) ---- */
+  --page: #F2F0EA;
   --surface: #FFFFFF;
-
+  --surface-sunk: #E7E4DB;
+  --line: #E1E7F2;
+  --line-strong: #CBD4E6;
   --ink: #494D5F;
-  --muted: #6E7385;
-  --faint: #9AA0B2;
+  --ink-2: #6E7385;
+  --ink-3: #9AA0B2;
 
-  --accent: #8458B3;
-  --accent-hover: #6F449C;
-  --accent-tint: #F2ECFB;
-  --accent-tint-border: #D0BDF4;
+  --violet: #8458B3;
+  --violet-hover: #6F449C;
+  --violet-tint: #F2ECFB;
+  --violet-tint-border: #D0BDF4;
+  --on-violet: #FFFFFF;
 
-  --border: #E1E7F2;
-  --border-strong: #CBD4E6;
+  --sky: #A0D2EB;
+  --lilac: #D0BDF4;
+
   --tint: #F2F5FB;
-  --tint-hover: #ECF0F9;
   --row-hover: #F8FAFD;
 
-  --risk-high-bg: #FAEDF0;
-  --risk-high-fg: #9E4459;
-  --risk-high-dot: #D98BA0;
-  --risk-ok-bg: #EAF4EF;
-  --risk-ok-fg: #3A7761;
-  --risk-ok-dot: #96C7B1;
+  --sev-high: #D98BA0;
+  --sev-med: #E8B784;
+  --sev-ok: #96C7B1;
+  --sev-high-bg: #FAEDF0;
+  --sev-med-bg: #FBF3E9;
+  --sev-ok-bg: #EAF4EF;
+  --sev-high-fg: #9E4459;
+  --sev-med-fg: #8A5A2B;
+  --sev-ok-fg: #3A7761;
 
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --grain-opacity: .06;
+  --intro-cover: #8458B3;
+}
+
+:root[data-theme="dark"] {
+  --page: #23252E;
+  --surface: #2B2E39;
+  --surface-sunk: #333744;
+  --line: #3B3F4D;
+  --line-strong: #4A4F60;
+  --ink: #E5EAF5;
+  --ink-2: #A8AEC1;
+  --ink-3: #767C8E;
+
+  --violet: #B08BE0;
+  --violet-hover: #C4A5EC;
+  --violet-tint: #352A47;
+  --violet-tint-border: #4A3B60;
+  --on-violet: #23252E; /* dark text on the lightened violet, never white */
+
+  --tint: #333744;
+  --row-hover: #333744;
+
+  --sev-high-bg: #3A2A30;
+  --sev-med-bg: #3A3128;
+  --sev-ok-bg: #27362F;
+  --sev-high-fg: #E5A9BA;
+  --sev-med-fg: #E8C79A;
+  --sev-ok-fg: #A9D8C2;
+
+  --grain-opacity: .04;
+  --intro-cover: #B08BE0;
 }
 
 html, body { margin: 0; height: 100%; }
@@ -53,9 +97,10 @@ html, body { margin: 0; height: 100%; }
 body {
   font-family: var(--sans);
   color: var(--ink);
-  background: var(--bg);
+  background: var(--page);
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
 button {
@@ -64,43 +109,66 @@ button {
   font-variant-numeric: tabular-nums;
 }
 input { font: inherit; color: var(--ink); }
-input::placeholder { color: var(--faint); }
-a { color: var(--accent); text-decoration: none; }
-a:hover { color: var(--accent-hover); }
+input::placeholder { color: var(--ink-3); }
+a { color: var(--violet); text-decoration: none; }
+a:hover { color: var(--violet-hover); }
 :focus { outline: none; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-::selection { background: var(--accent-tint); }
+:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+::selection { background: var(--violet-tint); }
 
-@keyframes fadeUp   { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@keyframes fadeUp6  { from { opacity: 0; transform: translateY(6px); }  to { opacity: 1; transform: none; } }
+/* Theme-transition only colour, never geometry. */
+.themed { transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, border-color var(--dur-fast) ease; }
+
+/* ---------------------------- keyframes ---------------------------- */
+
+@keyframes fadeUp10 { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes fadeUp8  { from { opacity: 0; transform: translateY(8px); }  to { opacity: 1; transform: none; } }
+@keyframes fadeUp6  { from { opacity: 0; transform: translateY(6px); }  to { opacity: 1; transform: none; } }
 @keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
-@keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.78); } }
-@keyframes dotsPulse{ 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
-@keyframes canvasIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
-@keyframes drawEdge { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
-@keyframes dotIn    { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+
+@keyframes dotsPulse { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@keyframes pulseDot  { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.78); } }
+@keyframes caretBlink{ 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+@keyframes dotPop   { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.5); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes nodeIn   { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+@keyframes dotIn    { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes drawEdge { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes tickDraw { from { stroke-dashoffset: 12; } to { stroke-dashoffset: 0; } }
 @keyframes strike   { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-@keyframes dotPop   { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.5); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes canvasIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes ripple   { from { transform: scale(1); opacity: .85; } to { transform: scale(3.2); opacity: 0; } }
 
-/* The design's fixed grain overlay. */
+/* Grain overlay: present in both themes, quieter in dark. */
 body::before {
   content: ''; position: fixed; inset: 0; pointer-events: none;
-  z-index: 2147483647; opacity: .06;
+  z-index: 2147483647; opacity: var(--grain-opacity);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+  transition: opacity var(--dur-fast) ease;
 }
 
+/* Reduced motion: keep opacity fades short, drop every movement. */
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; }
+  *, *::before, *::after {
+    animation-duration: var(--dur-micro) !important;
+    animation-delay: 0ms !important;
+    transition-duration: var(--dur-micro) !important;
+  }
+  /* Movement-bearing keyframes collapse to a plain fade. */
+  @keyframes fadeUp10 { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeUp8  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeUp6  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes canvasIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes nodeIn   { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes dotIn    { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes dotPop   { from { opacity: 0; } to { opacity: 1; } }
 }
 
-/* Shared primitives. The design repeats these inline; centralising them
-   keeps the components readable without changing any rendered value. */
+/* ---------------------------- primitives ---------------------------- */
+
 .label {
   font-size: 11px; line-height: 1.3; font-weight: 500;
-  letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint);
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3);
 }
 .mono { font-family: var(--mono); }
 .pill {
@@ -109,24 +177,56 @@ body::before {
 }
 .dot { width: 6px; height: 6px; border-radius: 999px; flex: none; }
 
-/* Hover states the design expresses via style-hover="…". */
-.hv-row { transition: background 120ms; }
-.hv-row:hover { background: var(--row-hover); }
-.hv-tint { transition: background 120ms; }
-.hv-tint:hover { background: var(--tint); }
-.hv-violet { transition: background 120ms, border-color 120ms, color 120ms; }
-.hv-violet:hover { background: var(--accent-tint); border-color: var(--accent-tint-border); color: var(--ink); }
-.hv-white { transition: background 120ms; }
-.hv-white:hover { background: var(--surface); }
-.hv-accent { transition: background 120ms, transform 200ms; }
-.hv-accent:hover { background: var(--accent-hover); }
-.hv-accent:active { transform: scale(0.98); }
+/* Hover: background-color and border-color only. Never move. */
+.hv-row    { transition: background-color var(--dur-micro) ease; }
+.hv-row:hover    { background: var(--row-hover); }
+.hv-tint   { transition: background-color var(--dur-micro) ease, border-color var(--dur-micro) ease; }
+.hv-tint:hover   { background: var(--tint); }
+.hv-violet { transition: background-color var(--dur-micro) ease, border-color var(--dur-micro) ease, color var(--dur-micro) ease; }
+.hv-violet:hover { background: var(--violet-tint); border-color: var(--violet-tint-border); color: var(--ink); }
+.hv-sunk   { transition: background-color var(--dur-micro) ease; }
+.hv-sunk:hover   { background: var(--surface-sunk); }
+.hv-accent { transition: background-color var(--dur-micro) ease; }
+.hv-accent:hover { background: var(--violet-hover); }
+.hv-accent:active { transform: scale(0.98); transition: transform var(--dur-fast) var(--ease-out); }
 
 .scroll { overflow-y: auto; }
 .scroll::-webkit-scrollbar { width: 10px; height: 10px; }
-.scroll::-webkit-scrollbar-thumb { background: #DCD9D0; border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+.scroll::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
 .scroll::-webkit-scrollbar-track { background: transparent; }
 
-/* Collapsible sections use the design's grid-template-rows 0fr/1fr technique. */
-.collapse { display: grid; transition: grid-template-rows 300ms var(--ease); }
+/* Expansion: grid-template-rows 0fr -> 1fr, never max-height.
+   Opening uses --dur-base; closing is quicker at --dur-fast. */
+.collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-fast) var(--ease-out); }
+.collapse[data-open="true"] { grid-template-rows: 1fr; transition-duration: var(--dur-base); }
 .collapse > div { overflow: hidden; min-height: 0; }
+/* Revealed children fade up 6px, 60ms after the height starts, 40ms stagger. */
+.collapse[data-open="true"] .stagger > * {
+  animation: fadeUp6 var(--dur-base) var(--ease-out) both;
+}
+.collapse[data-open="true"] .stagger > *:nth-child(1) { animation-delay: 60ms; }
+.collapse[data-open="true"] .stagger > *:nth-child(2) { animation-delay: 100ms; }
+.collapse[data-open="true"] .stagger > *:nth-child(3) { animation-delay: 140ms; }
+.collapse[data-open="true"] .stagger > *:nth-child(4) { animation-delay: 180ms; }
+.collapse[data-open="true"] .stagger > *:nth-child(5) { animation-delay: 220ms; }
+.collapse[data-open="true"] .stagger > *:nth-child(n+6) { animation-delay: 260ms; }
+
+/* Intro wipe cover. */
+.intro-cover {
+  position: fixed; inset: 0; z-index: 9000; background: var(--intro-cover);
+  pointer-events: none;
+}
+
+/* Quiet label controls brighten to primary ink on hover. */
+.hv-theme { transition: color var(--dur-micro) ease; }
+.hv-theme:hover { color: var(--ink); }
+
+/* Intro wipe: full-bleed circle collapsing onto the wordmark's fullstop. */
+@keyframes introShrink {
+  0%   { clip-path: circle(142% at var(--ix, 50%) var(--iy, 28%)); opacity: 1; }
+  82%  { clip-path: circle(3px  at var(--ix, 50%) var(--iy, 28%)); opacity: 1; }
+  100% { clip-path: circle(3px  at var(--ix, 50%) var(--iy, 28%)); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes introShrink { from { opacity: 0; } to { opacity: 0; } }
+}

@@ -97,20 +97,20 @@ def _chose(tool: str, plan: dict) -> str:
         bits = []
         if "structuring" in active:
             bits.append(
-                f"structuring — strict: {STRUCTURING_HIGH_MIN_COUNT}+ deposits in "
+                f"structuring, strict: {STRUCTURING_HIGH_MIN_COUNT}+ deposits in "
                 f"[${STRUCTURING_HIGH_LOW:,.0f}, ${NEAR_THRESHOLD_HIGH:,.0f}) inside "
                 f"{STRUCTURING_WINDOW_DAYS}d plus {STRUCTURING_CONSOLIDATION_RATIO:.0%} consolidated out; "
                 f"weaker tier: {STRUCTURING_MEDIUM_MIN_COUNT}+ from ${STRUCTURING_MEDIUM_LOW:,.0f}"
             )
         if "velocity" in active:
-            bits.append(f"velocity — peak hourly count above {VELOCITY_SIGMA:.0f}σ of the account's own baseline")
+            bits.append(f"velocity: peak hourly count above {VELOCITY_SIGMA:.0f}σ of the account's own baseline")
         if "rapid_movement" in active:
             bits.append(
-                f"rapid movement — {RAPID_MOVEMENT_RATIO:.0%} of inbound out within 48h, "
+                f"rapid movement: {RAPID_MOVEMENT_RATIO:.0%} of inbound out within 48h, "
                 f"min ${RAPID_MOVEMENT_MIN_INBOUND:,.0f} from {RAPID_MOVEMENT_MIN_SOURCES}+ senders"
             )
         if "high_risk_amount" in active:
-            bits.append(f"high-risk amount — single txn above {HIGH_RISK_AMOUNT_SIGMA:.0f}σ of the account's own history")
+            bits.append(f"high-risk amount: single txn above {HIGH_RISK_AMOUNT_SIGMA:.0f}σ of the account's own history")
         bits.append(f"z-score rules need {MIN_HISTORY_FOR_BASELINE}+ prior transactions before they fire")
         return "; ".join(bits)
 
@@ -132,7 +132,7 @@ def _chose(tool: str, plan: dict) -> str:
     if tool == "case_builder":
         return "entity, typologies, evidence table, timeline and ring subgraph per flagged account"
 
-    return "—"
+    return "n/a"
 
 
 def describe_steps(plan: dict, events: list[dict] | None = None) -> list[dict]:
@@ -160,7 +160,7 @@ def describe_steps(plan: dict, events: list[dict] | None = None) -> list[dict]:
             "elapsed_s": (event or {}).get("elapsed_s"),
             "chose": _chose(tool, plan),
             "because": step.get("reason", ""),
-            "returned": (event or {}).get("summary") or "—",
+            "returned": (event or {}).get("summary") or "n/a",
         })
 
     for step in plan.get("skipped", []):
@@ -199,7 +199,7 @@ def prose_plan(plan: dict) -> str:
     if is_conceptual(plan):
         return (
             "That's a question about how detection works rather than a query over the data, "
-            "so I didn't run any analysis — no transactions were scanned and no thresholds "
+            "so I didn't run any analysis. No transactions were scanned and no thresholds "
             "were evaluated."
         )
 
@@ -221,7 +221,7 @@ def prose_plan(plan: dict) -> str:
 
     notable = [PROSE_NOUNS[t] for t in skipped if t in PROSE_NOUNS]
     if notable:
-        sentence += f" I skipped {_join(notable)} — {_skip_reason(plan, skipped)}"
+        sentence += f" I skipped {_join(notable)}: {_skip_reason(plan, skipped)}"
     return sentence
 
 
@@ -247,7 +247,7 @@ def explain_typologies() -> list[dict]:
                     f"${NEAR_THRESHOLD_HIGH:,.0f} into one account within {STRUCTURING_WINDOW_DAYS} days, "
                     f"AND at least {STRUCTURING_CONSOLIDATION_RATIO:.0%} of it sent back out within "
                     f"{STRUCTURING_CONSOLIDATION_WINDOW_DAYS} days.",
-            "why": "The onward transfer is what separates laundering from an ordinary cash business — "
+            "why": "The onward transfer is what separates laundering from an ordinary cash business: "
                    "a shop banks its takings and leaves them; a mule account gathers and forwards.",
         },
         {
@@ -255,12 +255,12 @@ def explain_typologies() -> list[dict]:
             "what": "The same sub-threshold deposit pattern, but without a confirmed onward transfer.",
             "rule": f"{STRUCTURING_MEDIUM_MIN_COUNT}+ transactions between ${STRUCTURING_MEDIUM_LOW:,.0f} and "
                     f"${NEAR_THRESHOLD_HIGH:,.0f} within {STRUCTURING_WINDOW_DAYS} days, either side of the account.",
-            "why": "A weaker indicator on its own — plenty of legitimate businesses look like this — "
+            "why": "A weaker indicator on its own, since plenty of legitimate businesses look like this, "
                    "so it can put an account in front of an analyst but never escalates it by itself.",
         },
         {
             "name": "RAPID_MOVEMENT",
-            "what": "Money arriving from several sources and leaving again almost immediately — a pass-through "
+            "what": "Money arriving from several sources and leaving again almost immediately: a pass-through "
                     "or funnel account.",
             "rule": f"{RAPID_MOVEMENT_RATIO:.0%}+ of inbound funds sent out within 48 hours, on at least "
                     f"${RAPID_MOVEMENT_MIN_INBOUND:,.0f} gathered from {RAPID_MOVEMENT_MIN_SOURCES}+ distinct senders.",
@@ -280,11 +280,11 @@ def explain_typologies() -> list[dict]:
             "what": "A single transaction wildly out of character for the account.",
             "rule": f"One amount more than {HIGH_RISK_AMOUNT_SIGMA:.0f} standard deviations above the account's own "
                     f"history, with {MIN_HISTORY_FOR_BASELINE}+ prior transactions.",
-            "why": "Same reasoning as velocity — the account is compared against itself, not the population.",
+            "why": "Same reasoning as velocity: the account is compared against itself, not the population.",
         },
         {
             "name": "FAN_IN_RING",
-            "what": "Many accounts feeding one collector account, which then forwards the pooled money on — "
+            "what": "Many accounts feeding one collector account, which then forwards the pooled money on: "
                     "the classic smurfing ring.",
             "rule": f"{FAN_IN_MIN_SENDERS}+ distinct senders into one account within {FAN_IN_WINDOW_DAYS} days, "
                     f"with {FAN_IN_CONSOLIDATION_RATIO:.0%}+ of the gathered total moving onward.",
@@ -293,10 +293,10 @@ def explain_typologies() -> list[dict]:
         },
         {
             "name": "CYCLE",
-            "what": "Money that travels through several accounts and returns near where it started — layering "
+            "what": "Money that travels through several accounts and returns near where it started: layering "
                     "to obscure its origin.",
             "rule": f"A closed loop of 3 to {CYCLE_MAX_HOPS} hops on the transfer graph.",
-            "why": "Two-party back-and-forth is excluded deliberately — that's just two people who both pay "
+            "why": "Two-party back-and-forth is excluded deliberately, since that's just two people who both pay "
                    "each other, which is extremely common and not laundering.",
         },
     ]
@@ -322,7 +322,7 @@ def prose_results(results: list[dict], cases: list[dict]) -> str:
     if tier_bits:
         parts.append(_join(tier_bits))
 
-    sentence = " — ".join(parts) + "."
+    sentence = ", ".join(parts) + "."
 
     if typologies:
         top = sorted(typologies.items(), key=lambda kv: -kv[1])[:3]

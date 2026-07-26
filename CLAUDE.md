@@ -158,34 +158,66 @@ these tokens are transcribed from it verbatim and live in
 Aesthetic: "compliance case desk" — light, institutional, calm, precise. It must
 look like an internal tool a bank ships, not a hackathon demo.
 
-Tokens (defined once in `frontend/src/index.css`; never inline a raw hex):
-- `--bg: #F2F0EA` (warm neutral) · `--surface: #FFFFFF` · `--side-bg: #E7E4DB`
-- `--ink: #494D5F` · `--muted: #6E7385` · `--faint: #9AA0B2`
-- `--accent: #8458B3` (violet — interactive elements only) · `--accent-tint: #F2ECFB`
-- `--border: #E1E7F2` · `--border-strong: #CBD4E6` · `--tint: #F2F5FB`
-- Risk: `--risk-high-bg/fg/dot: #FAEDF0 / #9E4459 / #D98BA0`;
-  settled/ok: `#EAF4EF / #3A7761 / #96C7B1`
-- Radii: 10px controls · 14px cards · 22px landing composer · 999px pills.
+Two themes. **Light is the default**; dark is a designed theme, not an
+inversion, with its own palette and tint set. The choice persists in
+`localStorage` under `caseline-theme`. The toggle lives in the sidebar ONLY
+(above the footer, collapsing to a bare dot in the rail); never in the
+header, canvas or composer.
+
+Tokens (defined once in `frontend/src/index.css`, light under `:root` and
+dark under `:root[data-theme="dark"]`; never inline a raw hex):
+
+| Token | Light | Dark |
+|---|---|---|
+| `--page` | `#F2F0EA` | `#23252E` |
+| `--surface` | `#FFFFFF` | `#2B2E39` |
+| `--surface-sunk` | `#E7E4DB` | `#333744` |
+| `--line` / `--line-strong` | `#E1E7F2` / `#CBD4E6` | `#3B3F4D` / `#4A4F60` |
+| `--ink` / `--ink-2` / `--ink-3` | `#494D5F` / `#6E7385` / `#9AA0B2` | `#E5EAF5` / `#A8AEC1` / `#767C8E` |
+| `--violet` / `--violet-hover` | `#8458B3` / `#6F449C` | `#B08BE0` / `#C4A5EC` |
+| `--violet-tint` | `#F2ECFB` | `#352A47` |
+| `--on-violet` | `#FFFFFF` | `#23252E` |
+
+Severity dots keep one set across both themes (`--sev-high #D98BA0`,
+`--sev-med #E8B784`, `--sev-ok #96C7B1`); only their tint backgrounds and
+text colours change. `--sky #A0D2EB` and `--lilac #D0BDF4` are unchanged in
+both. The grain overlay stays in dark at `.04` (light is `.06`).
+
+Motion tokens, and nothing outside this set:
+`--ease-out: cubic-bezier(0.22,1,0.36,1)` (arrivals, expansions) ·
+`--ease-in-out: cubic-bezier(0.65,0,0.35,1)` (moves, the intro wipe) ·
+`--dur-micro 120ms` · `--dur-fast 200ms` · `--dur-base 300ms` ·
+`--dur-slow 420ms` · stagger unit `40ms`.
 
 Rules:
-- **Risk is the only thing that gets a rose or green tint.** The violet accent
-  is for interaction (send, active plan step, selected node), never for risk.
-- Type: DM Sans for UI; DM Mono for account IDs, amounts, txn refs and every
-  trace/step readout; `tabular-nums` throughout; currency formatted via the
-  `usd()` helper, never raw floats.
-- Three panes: sidebar (investigations, collapsible) · centre thread (prose +
-  expandable execution plan + result chips) · right Canvas (case / flow /
+- **Risk is the only thing that gets a severity tint.** Violet is for
+  interaction (send, active step, selected node), never for risk.
+- Never white text on the lightened dark violet; primary buttons use
+  `--on-violet`. Never slate text on violet. Charts use violet, sky, lilac
+  in that order; axes and labels use `--ink-3`.
+- Type: Montserrat 400/500 for UI, JetBrains Mono 400/500 for all data.
+  Weights never above 500. `tabular-nums` globally.
+- Icons: five inline SVG primitives only (chevron, dot, arrow, cross, plus),
+  1.5px stroke, round caps. No icon libraries, no emoji.
+- Radii: 10px controls/rows · 14px cards · 22px large composer · 999px
+  pills. No gradients. Shadows only on the canvas panel and popovers.
+- Expansion is always CSS grid `grid-template-rows: 0fr -> 1fr`, never
+  max-height. Opening `--dur-base`, closing `--dur-fast`.
+- Hover changes background-color and border-color only. Never translate,
+  scale or shadow.
+- Prohibited: bounce/elastic overshoot, spinners (use the three-dot violet
+  pulse), parallax, scroll-triggered reveals, looping ambient animation,
+  skeleton shimmer.
+- `prefers-reduced-motion`: keep opacity fades at `--dur-micro`, drop all
+  movement.
+- Three panes: sidebar (investigations, collapsible; auto-collapses to a
+  rail while a canvas is open) · centre thread · right Canvas (case / flow /
   table / method / SAR / about). The 3 problem-statement queries are the
   landing chips, verbatim.
-- Motion: the design's own budget — plan-step ticks, chip/canvas entrances and
-  the graph edge-draw. Everything else instant. Skeletons, never spinners.
-- Empty state teaches: example chips + one line on what the agent can do.
-- Buttons say what they do: "Draft SAR narrative", "Export case file".
-- Banned: dark mode, gradients, glassmorphism, emoji icons, decorative charts,
-  more than the two typefaces above.
-- Must be fully readable at 1280×720 (projector). Test at that size.
-- Ring graph: neutral nodes, violet aggregator, rose edges only when the ring
-  is isolated; click the aggregator → isolate. No physics chaos.
+- **No em dashes anywhere in user-facing copy** — this includes backend
+  prose (`tools/narrate.py`) and `risk_scorer` explanations, which are
+  rendered directly in the UI.
+- Must be fully readable at 1280x720 (projector). Test at that size.
 
 **Every figure on screen comes from a live endpoint.** The design file's
 script contains illustrative placeholder numbers (a different scoring
