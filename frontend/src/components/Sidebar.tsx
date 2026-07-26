@@ -69,10 +69,10 @@ export function Sidebar({
               <path d="M5 1v8M1 5h8" stroke="var(--violet)" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           </button>
-          <button aria-label="Expand sidebar" onClick={onToggle} className="hv-tint"
-            style={{ width: 32, height: 32, flex: "none", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
-              <path d="M2.5 1 6 4 2.5 7" stroke="var(--ink-3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <button aria-label="Expand sidebar" onClick={onToggle} title="Expand sidebar" className="hv-violet"
+            style={{ width: 32, height: 32, flex: "none", borderRadius: 10, border: "1px solid var(--line)", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="9" height="9" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+              <path d="M2.5 1 6 4 2.5 7" stroke="var(--ink-2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, paddingTop: 8 }}>

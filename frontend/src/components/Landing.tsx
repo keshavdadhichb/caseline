@@ -27,7 +27,7 @@ export function Landing({
   const intro = useIntroWipe(dotRef);
 
   // The headline starts typing once the wipe has converged on the dot.
-  const headline = useTypewriter(HEADLINE, { start: true });
+  const headline = useTypewriter(HEADLINE, { start: intro.running || !intro.visible });
   const placeholder = usePlaceholderCycle(suggestions, focused || draft.length > 0);
 
   const send = () => {
@@ -39,18 +39,18 @@ export function Landing({
 
   return (
     <>
-      {intro.active && (
+      {intro.visible && (
         <div
           aria-hidden="true"
           className="intro-cover"
           style={{
-            // Collapses from a full-bleed circle onto the measured centre of
-            // the wordmark's fullstop, so the motion resolves onto the brand
-            // mark rather than an arbitrary point.
-            clipPath: `circle(142% at ${intro.origin.x} ${intro.origin.y})`,
-            animation: "introShrink 900ms var(--ease-in-out) forwards",
-            ["--ix" as string]: intro.origin.x,
-            ["--iy" as string]: intro.origin.y,
+            // Stays a full opaque cover until the dot has been measured, then
+            // collapses onto it. Starting before the measurement would aim the
+            // wipe at a default point and visibly jump when it corrected.
+            clipPath: `circle(142% at ${intro.origin?.x ?? "50%"} ${intro.origin?.y ?? "28%"})`,
+            animation: intro.running ? "introShrink 900ms var(--ease-in-out) forwards" : undefined,
+            ["--ix" as string]: intro.origin?.x ?? "50%",
+            ["--iy" as string]: intro.origin?.y ?? "28%",
           }}
         />
       )}
@@ -66,14 +66,16 @@ export function Landing({
             {WORDMARK.split("").map((ch, i) => (
               <span key={i} style={{ display: "inline-block", animation: "fadeUp6 360ms var(--ease-out) both", animationDelay: `${i * 45}ms` }}>{ch}</span>
             ))}
-            <span
-              ref={dotRef}
-              style={{
-                display: "inline-block", width: 6, height: 6, borderRadius: 999,
-                background: "var(--violet)", marginLeft: 4,
+            {/* The wipe is aimed at THIS wrapper, not the dot itself: the dot
+                starts at scale(0) from dotPop's `both` fill, so its own
+                bounding box measures zero. The wrapper's layout box is
+                unaffected by the child's transform. */}
+            <span ref={dotRef} style={{ display: "inline-block", width: 6, height: 6, marginLeft: 4, verticalAlign: "baseline" }}>
+              <span style={{
+                display: "block", width: 6, height: 6, borderRadius: 999, background: "var(--violet)",
                 animation: "dotPop var(--dur-slow) var(--ease-out) both", animationDelay: "760ms",
-              }}
-            />
+              }} />
+            </span>
           </div>
 
           <h1 style={{ fontSize: 34, lineHeight: 1.18, fontWeight: 500, letterSpacing: "-0.025em", textAlign: "center", margin: "0 0 16px", color: "var(--ink)", minHeight: 41 }}>

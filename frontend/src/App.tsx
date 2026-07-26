@@ -86,10 +86,14 @@ export default function App() {
 
   /* The canvas needs the width, so the rail collapses while one is open and
      returns to whatever the user had chosen when it closes. */
+  /* Depends on whether a canvas is open, NOT on the canvas object: setCanvas
+     produces a fresh object on every chip click, so keying off identity
+     re-collapsed the rail each time the user opened another artifact, making
+     a manual expand look like it did nothing. */
+  const canvasOpen = canvas !== null;
   useEffect(() => {
-    if (canvas) setSideOpen(false);
-    else setSideOpen(userSideOpen.current);
-  }, [canvas]);
+    setSideOpen(canvasOpen ? false : userSideOpen.current);
+  }, [canvasOpen]);
 
   useEffect(() => {
     api.stats().then(setStats).catch(() => { });

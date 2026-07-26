@@ -2,7 +2,7 @@
    Each hook honours prefers-reduced-motion by settling on its final state
    immediately rather than animating toward it. */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export type Theme = "light" | "dark";
 const STORAGE_KEY = "caseline-theme";
@@ -97,30 +97,54 @@ export function useCountUp(target: number, duration = 600) {
   return value;
 }
 
-/** The landing intro wipe. The cover collapses to the measured centre of
- *  the wordmark's fullstop, so the motion resolves onto the brand mark
- *  rather than an arbitrary point. Runs once per page load. */
-export function useIntroWipe(dotRef: React.RefObject<HTMLElement | null>) {
-  const [phase, setPhase] = useState<"covering" | "gone">(() => (reduced() ? "gone" : "covering"));
-  const [origin, setOrigin] = useState({ x: "50%", y: "28%" });
+/** The landing intro wipe. The cover collapses onto the measured centre of
+ *  the wordmark's fullstop, so the motion resolves onto the brand mark.
+ *
+ *  Measuring this correctly is fiddlier than it looks, and two things broke
+ *  it before:
+ *    · the dot animates in via dotPop with `both` fill, so at measure time
+ *      it sits at scale(0) and getBoundingClientRect reports a zero-size
+ *      box. The ref must therefore point at an UNANIMATED wrapper around
+ *      the dot, whose layout box is correct regardless of the child's
+ *      transform.
+ *    · the wordmark is set in a webfont; until it loads, the fallback face
+ *      has different metrics and the dot sits somewhere else. Measuring
+ *      before `document.fonts.ready` aims the wipe at a stale position.
+ *  So: wait for fonts, measure, and only then start the animation. The
+ *  cover is opaque for that whole time, so the wait is invisible. */
+export function useIntroWipe(anchorRef: React.RefObject<HTMLElement | null>) {
+  const [phase, setPhase] = useState<"waiting" | "running" | "gone">(
+    () => (reduced() ? "gone" : "waiting"),
+  );
+  const [origin, setOrigin] = useState<{ x: string; y: string } | null>(null);
 
-  useEffect(() => {
-    if (phase === "gone") return;
-    const el = dotRef.current;
-    if (el) {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0) {
+  useLayoutEffect(() => {
+    if (reduced()) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const start = () => {
+      if (cancelled) return;
+      const el = anchorRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
         setOrigin({
           x: `${((r.left + r.width / 2) / window.innerWidth) * 100}%`,
           y: `${((r.top + r.height / 2) / window.innerHeight) * 100}%`,
         });
       }
-    }
-    const id = setTimeout(() => setPhase("gone"), 1200);
-    return () => clearTimeout(id);
-  }, [phase, dotRef]);
+      setPhase("running");
+      timer = setTimeout(() => { if (!cancelled) setPhase("gone"); }, 950);
+    };
 
-  return { active: phase === "covering", origin };
+    const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
+    if (fonts?.ready) fonts.ready.then(start).catch(start);
+    else start();
+
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [anchorRef]);
+
+  return { visible: phase !== "gone", running: phase === "running", origin };
 }
 
 /** Reveals list items one at a time (execution-plan steps arrive ~520ms apart). */
