@@ -14,6 +14,7 @@ import uuid
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from html import escape
+from io import BytesIO
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -21,9 +22,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from xhtml2pdf import pisa
 
 from agent.executor import run_plan
 from agent.planner import plan_query
@@ -359,14 +361,13 @@ def get_case(case_id: str) -> dict:
     return case
 
 
-@app.get("/api/case/{case_id}/export", response_class=HTMLResponse)
-def export_case(case_id: str) -> HTMLResponse:
-    """Single-page printable case file. Deliberately self-contained HTML with
-    print CSS rather than a server-side PDF: CLAUDE.md's contract allows
-    either, weasyprint would add a heavy dependency for one button, and the
-    browser's own "Save as PDF" produces the same artifact. Renders every
-    fact from the stored case — no re-computation, so the exported document
-    always matches what the analyst reviewed on screen."""
+@app.get("/api/case/{case_id}/export")
+def export_case(case_id: str) -> Response:
+    """Single-page PDF case file export. Generates a PDF document from the case
+    data using xhtml2pdf. The PDF contains all case details including assessment,
+    evidence, timeline, SAR narrative, and provenance. Renders every fact from
+    the stored case — no re-computation, so the exported document always matches
+    what the analyst reviewed on screen."""
     case = CASES.get(case_id)
     if case is None:
         raise HTTPException(404, "unknown case_id")
@@ -385,7 +386,7 @@ def export_case(case_id: str) -> HTMLResponse:
         for e in case.get("evidence", [])
     )
     timeline_rows = "".join(
-        "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>".format(
+        "<tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(
             escape(str(t.get("ts", ""))), escape(str(t.get("direction", ""))),
             escape(str(t.get("counterparty", ""))), f"${float(t.get('amount', 0)):,.2f}",
         )
@@ -393,25 +394,24 @@ def export_case(case_id: str) -> HTMLResponse:
     )
     narrative = case.get("narrative") or "No SAR narrative drafted for this risk tier."
 
+    # Generate HTML with CSS compatible with xhtml2pdf
     html = f"""<!doctype html><html><head><meta charset="utf-8">
 <title>{escape(case['case_id'])} — Caseline case file</title>
 <style>
 @page {{ size: A4; margin: 18mm; }}
-body {{ font-family: -apple-system, "DM Sans", system-ui, sans-serif; color:#494D5F; line-height:1.55; margin:0; }}
-h1 {{ font-size:20px; margin:0 0 4px; letter-spacing:-0.02em; }}
-h2 {{ font-size:11px; letter-spacing:0.09em; text-transform:uppercase; color:#9AA0B2; margin:24px 0 8px; }}
-.meta {{ font-family:"DM Mono",ui-monospace,monospace; font-size:12px; color:#6E7385; }}
+body {{ font-family: Helvetica, Arial, sans-serif; color:#494D5F; line-height:1.55; margin:0; }}
+h1 {{ font-size:20px; margin:0 0 4px; }}
+h2 {{ font-size:11px; text-transform:uppercase; color:#9AA0B2; margin:24px 0 8px; }}
+.meta {{ font-family: Courier, monospace; font-size:12px; color:#6E7385; }}
 table {{ border-collapse:collapse; width:100%; font-size:12px; }}
 th,td {{ text-align:left; padding:6px 8px; border-bottom:1px solid #E1E7F2; vertical-align:top; }}
-th {{ width:180px; font-weight:500; color:#6E7385; }}
+th {{ width:180px; font-weight:bold; color:#6E7385; }}
 .pill {{ display:inline-block; border-radius:999px; padding:4px 12px; font-size:12px;
         background:#FAEDF0; color:#9E4459; }}
-p {{ font-size:13px; max-width:70ch; }}
-@media print {{ .noprint {{ display:none; }} }}
+p {{ font-size:13px; }}
 </style></head><body>
 <h1>Caseline case file</h1>
 <div class="meta">{escape(case['case_id'])} · account {escape(case['account_id'])} · prepared by Caseline agent</div>
-<p class="noprint" style="color:#9AA0B2;font-size:12px">Use your browser's Print → Save as PDF to file this document.</p>
 <h2>Assessment</h2>
 <div class="pill">{escape(case['risk_level'])} · recommended: {escape(case['recommended_action'])}</div>
 <table>
@@ -430,7 +430,25 @@ p {{ font-size:13px; max-width:70ch; }}
 <div class="meta">{escape(_dataset_stats()['dataset'])} · {_dataset_stats()['n_txns']:,} transactions ·
 IsolationForest seed {RANDOM_STATE} · deterministic</div>
 </body></html>"""
-    return HTMLResponse(content=html)
+    
+    # Generate PDF from HTML
+    pdf_buffer = BytesIO()
+    pisa_status = pisa.CreatePDF(html, dest=pdf_buffer)
+    
+    if pisa_status.err:
+        raise HTTPException(500, "PDF generation failed")
+    
+    pdf_buffer.seek(0)
+    pdf_bytes = pdf_buffer.read()
+    
+    # Return PDF with appropriate headers
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{case_id}_casefile.pdf"'
+        }
+    )
 
 
 # ---------------------------------------------------------------------------

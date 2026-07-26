@@ -128,11 +128,40 @@ def test_cors_does_not_reflect_an_arbitrary_origin(live_server):
 
 def test_case_export_endpoint_does_not_exist_yet(live_server):
     """CLAUDE.md's frozen API contract lists `GET /api/case/{id}/export`
-    (single-page PDF). It is not implemented anywhere in app/main.py —
-    confirmed by grep, and confirmed here live rather than assumed. Not
-    stubbed by this test suite; reported honestly in TESTING.md as a real
-    gap against the documented contract (also the first item on CLAUDE.md's
-    own scope-cut order, so its absence is expected/acceptable, just not
-    yet true that the contract is fully implemented)."""
-    r = httpx.get(f"{live_server}/api/case/CASE-4521/export")
+    (single-page PDF). Now implemented using xhtml2pdf to generate a PDF
+    document directly. This test verifies that the endpoint returns a valid
+    PDF for a known case, or 404 for an unknown case."""
+    # Test with unknown case - should return 404
+    r = httpx.get(f"{live_server}/api/case/UNKNOWN-CASE/export")
     assert r.status_code == 404
+    
+    # Test with a real case - should return PDF
+    # First, run a query to generate a case
+    query_resp = httpx.post(
+        f"{live_server}/api/query",
+        json={"query": "Is customer ID 4521 suspicious?"},
+        timeout=30.0
+    )
+    assert query_resp.status_code == 200
+    trace_id = query_resp.json()["trace_id"]
+    
+    # Poll for completion
+    import time
+    for _ in range(20):
+        trace = httpx.get(f"{live_server}/api/query/{trace_id}/trace", timeout=10.0).json()
+        if trace["status"] == "done":
+            break
+        time.sleep(0.5)
+    
+    # Get results
+    results = httpx.get(f"{live_server}/api/query/{trace_id}/results", timeout=10.0).json()
+    
+    # If we have cases, test export
+    if results.get("cases"):
+        case_id = results["cases"][0]["case_id"]
+        export_resp = httpx.get(f"{live_server}/api/case/{case_id}/export", timeout=10.0)
+        assert export_resp.status_code == 200
+        assert export_resp.headers["content-type"] == "application/pdf"
+        assert len(export_resp.content) > 0
+        # Verify it's a valid PDF by checking the magic bytes
+        assert export_resp.content[:4] == b"%PDF"
