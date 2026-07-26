@@ -1,0 +1,99 @@
+{
+  "intent": "entity_lookup",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": [
+      "4001"
+    ]
+  },
+  "typologies": [
+    "structuring",
+    "velocity",
+    "rapid_movement",
+    "high_risk_amount"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "accounts": [
+          "4001"
+        ]
+      },
+      "reason": "Scope the dataset to only transactions involving customer 4001 before any analysis."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "accounts": [
+          "4001"
+        ],
+        "features": [
+          "7d_txn_count",
+          "30d_txn_count",
+          "7d_sum",
+          "30d_sum",
+          "amount_zscore",
+          "velocity",
+          "pct_near_10k",
+          "rapid_in_out_ratio"
+        ]
+      },
+      "reason": "Compute per-account rolling features for cust 4001 \u2014 required as input for rules_engine, anomaly_model, and risk_scorer."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "accounts": [
+          "4001"
+        ],
+        "typologies": [
+          "structuring",
+          "velocity",
+          "rapid_movement",
+          "high_risk_amount"
+        ]
+      },
+      "reason": "Check all named typology rules against cust 4001's features to identify any rule-based flags."
+    },
+    {
+      "tool": "anomaly_model",
+      "params": {
+        "accounts": [
+          "4001"
+        ]
+      },
+      "reason": "Since the query is a broad 'is this account suspicious?' question with no specific typology named, run anomaly scoring to catch anything rules might miss."
+    },
+    {
+      "tool": "graph_analysis",
+      "params": {
+        "accounts": [
+          "4001"
+        ],
+        "analysis": [
+          "fan_in_ring",
+          "short_cycle"
+        ]
+      },
+      "reason": "Investigate whether cust 4001 is part of any network ring or has suspicious counterparty patterns \u2014 relevant for an open-ended suspicion query on a single entity."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "accounts": [
+          "4001"
+        ]
+      },
+      "reason": "Combine rule hits, anomaly score, and graph findings into a final LOW/MEDIUM/HIGH risk rating for cust 4001."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a single-entity query, not a broad/overview question \u2014 profile_data is only needed for population-wide EDA summaries."
+    }
+  ],
+  "clarification_needed": null
+}

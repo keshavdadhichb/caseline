@@ -2,6 +2,8 @@
   "intent": "detect_rapid_movement",
   "filters": {
     "window_days": null,
+    "date_from": null,
+    "date_to": null,
     "min_amount": null,
     "accounts": null
   },
@@ -15,17 +17,20 @@
         "scope": "all_accounts",
         "channel": "all"
       },
-      "reason": "Establish the full dataset baseline before computing rapid in->out ratios across all accounts."
+      "reason": "Scope the full dataset for all accounts and channels \u2014 no date or amount filters are specified, so we use the entire transaction history."
     },
     {
       "tool": "feature_engine",
       "params": {
         "features": [
-          "rapid_in_out_ratio"
-        ],
-        "window_hours": 48
+          "rapid_in_out_ratio",
+          "7d_txn_count",
+          "7d_txn_sum",
+          "30d_txn_count",
+          "30d_txn_sum"
+        ]
       },
-      "reason": "Compute per-account rapid in->out ratio within a 48-hour rolling window \u2014 the core metric needed to answer this query."
+      "reason": "Compute the per-account rapid in->out ratio (funds leaving within 48 hours of receipt) and rolling velocity features required by the rules engine and risk scorer."
     },
     {
       "tool": "rules_engine",
@@ -34,30 +39,44 @@
           "rapid_movement"
         ]
       },
-      "reason": "Apply the rapid_movement named rule to flag accounts whose 48-hour in->out ratio exceeds the defined threshold."
+      "reason": "Apply the rapid_movement rule to flag accounts where a high proportion of incoming funds exit within 48 hours \u2014 this is exactly the typology the query describes."
+    },
+    {
+      "tool": "anomaly_model",
+      "params": {
+        "method": "IsolationForest",
+        "baseline": "full_population"
+      },
+      "reason": "Broad query with no specific entity or threshold \u2014 anomaly scoring catches accounts whose rapid-movement behaviour is statistically unusual even if they narrowly miss a rule threshold."
     },
     {
       "tool": "risk_scorer",
       "params": {
         "inputs": [
-          "rules_engine"
+          "rules_engine",
+          "anomaly_model"
+        ],
+        "output_levels": [
+          "LOW",
+          "MEDIUM",
+          "HIGH"
         ]
       },
-      "reason": "Rank and score flagged accounts so analysts can prioritize review by LOW/MEDIUM/HIGH risk level."
+      "reason": "Combine rule hits and anomaly scores into a ranked risk level so analysts can prioritise the most concerning rapid-movement accounts."
     }
   ],
   "skipped": [
     {
       "tool": "profile_data",
-      "reason": "This is a targeted typology question, not a broad overview query \u2014 EDA summary adds no value here."
+      "reason": "The query targets a specific behaviour (rapid in->out movement), not a broad exploratory overview of the dataset."
     },
     {
-      "tool": "anomaly_model",
-      "reason": "The rapid_movement rule directly captures the 48-hour in->out behavior; anomaly_model is redundant for this narrowly-scoped, well-defined threshold question."
+      "tool": "aggregate_data",
+      "reason": "This is a typology/pattern question (rapid movement), not a plain counting/threshold question \u2014 aggregate_data would not capture the in->out timing relationship."
     },
     {
       "tool": "graph_analysis",
-      "reason": "The query asks about individual account fund-movement speed, not network rings or counterparty relationships \u2014 graph analysis is not applicable."
+      "reason": "The query asks about individual account behaviour over time, not network patterns, rings, or counterparty relationships."
     }
   ],
   "clarification_needed": null

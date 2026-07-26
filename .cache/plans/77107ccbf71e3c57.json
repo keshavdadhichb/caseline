@@ -2,8 +2,10 @@
   "intent": "detect_ring",
   "filters": {
     "window_days": null,
+    "date_from": null,
+    "date_to": null,
     "min_amount": null,
-    "accounts": []
+    "accounts": null
   },
   "typologies": [
     "rapid_movement"
@@ -12,60 +14,43 @@
     {
       "tool": "filter_data",
       "params": {},
-      "reason": "Scope the full dataset to ensure clean, consistent transaction records before graph construction \u2014 no specific date/account/amount filter, so all data is included."
+      "reason": "Scope the full dataset for graph analysis \u2014 no specific date, amount, or account filters provided, so we use the entire population."
     },
     {
       "tool": "feature_engine",
-      "params": {
-        "features": [
-          "rapid_in_out_ratio",
-          "velocity",
-          "7d_txn_count",
-          "30d_txn_count"
-        ]
-      },
-      "reason": "Compute per-account features such as rapid in->out ratio and velocity, which help characterize accounts acting as collection hubs in a fan-in ring."
+      "params": {},
+      "reason": "Compute per-account rolling features (velocity, rapid in->out ratio) needed to enrich graph findings and feed the risk scorer."
     },
     {
       "tool": "graph_analysis",
       "params": {
-        "detection_modes": [
-          "fan_in_ring",
-          "short_cycle"
-        ],
-        "min_accounts": 2
+        "pattern": "fan_in_ring",
+        "detect_short_cycles": true
       },
-      "reason": "Core tool for this query \u2014 detects fan-in rings (multiple accounts funneling money into one) and short cycles that indicate coordinated layering or collection networks."
-    },
-    {
-      "tool": "rules_engine",
-      "params": {
-        "typologies": [
-          "rapid_movement"
-        ]
-      },
-      "reason": "Flag accounts within detected rings that also exhibit rapid_movement behavior (fast in->out), reinforcing ring membership with rule-based evidence."
+      "reason": "Core tool for this query \u2014 detects fan-in patterns (multiple accounts funneling money into one) and short cycles indicative of ring structures using networkx."
     },
     {
       "tool": "risk_scorer",
-      "params": {
-        "inputs": [
-          "graph_analysis",
-          "rules_engine",
-          "feature_engine"
-        ]
-      },
-      "reason": "Combine graph ring findings, rule hits, and computed features into a final LOW/MEDIUM/HIGH risk rating per flagged account for analyst review."
+      "params": {},
+      "reason": "Assign LOW/MEDIUM/HIGH risk levels to flagged accounts and rings identified by graph analysis, combining graph findings with feature-based signals."
     }
   ],
   "skipped": [
     {
+      "tool": "aggregate_data",
+      "reason": "This is a network/ring pattern question, not a plain counting or threshold aggregation task."
+    },
+    {
       "tool": "profile_data",
-      "reason": "This is a targeted structural/pattern query, not a broad overview request. A general EDA summary adds no value to ring detection."
+      "reason": "Not an overview/EDA query \u2014 the question targets a specific structural pattern, so a broad summary adds no value."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No named typology rules (structuring, velocity, high_risk_amount) are being targeted \u2014 the ring detection is handled entirely by graph_analysis."
     },
     {
       "tool": "anomaly_model",
-      "reason": "The query has a clearly defined typology (fan-in ring). The anomaly model is for broad 'find anything suspicious' queries \u2014 graph_analysis directly addresses this pattern."
+      "reason": "The query is narrowly scoped to fan-in ring detection; anomaly scoring across the full population is unnecessary and adds noise here."
     }
   ],
   "clarification_needed": null

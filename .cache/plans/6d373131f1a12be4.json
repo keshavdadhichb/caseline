@@ -1,0 +1,47 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "date_from": null,
+    "date_to": null,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No data query was made; this is a conceptual/definitional question."
+    },
+    {
+      "tool": "aggregate_data",
+      "reason": "No data query was made; this is a conceptual/definitional question."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "No data query was made; this is a conceptual/definitional question."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No data query was made; this is a conceptual/definitional question."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No data query was made; this is a conceptual/definitional question."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No data query was made; this is a conceptual/definitional question."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No data query was made; this is a conceptual/definitional question."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No data query was made; this is a conceptual/definitional question."
+    }
+  ],
+  "clarification_needed": null
+}

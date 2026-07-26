@@ -2,6 +2,8 @@
   "intent": "detect_high_risk_amount",
   "filters": {
     "window_days": null,
+    "date_from": null,
+    "date_to": null,
     "min_amount": null,
     "accounts": null
   },
@@ -12,11 +14,12 @@
     {
       "tool": "filter_data",
       "params": {
-        "accounts": null,
+        "date_from": null,
+        "date_to": null,
         "min_amount": null,
-        "window_days": null
+        "accounts": null
       },
-      "reason": "Scope the full dataset before computing any per-account statistics. No explicit filters were given, so all accounts and dates are included."
+      "reason": "Scope the full dataset for all accounts and transactions before any per-account analysis."
     },
     {
       "tool": "feature_engine",
@@ -27,7 +30,7 @@
           "30d_txn_count"
         ]
       },
-      "reason": "Compute per-account rolling amount z-scores to identify transactions that are statistically large relative to each account's own baseline \u2014 the core signal for this query."
+      "reason": "Compute per-account amount z-scores and rolling statistics to identify transactions that are statistically large relative to each account's own history."
     },
     {
       "tool": "rules_engine",
@@ -36,14 +39,14 @@
           "high_risk_amount"
         ]
       },
-      "reason": "Apply the high_risk_amount rule to flag accounts/transactions whose z-scores or absolute amounts exceed defined thresholds."
+      "reason": "Apply the high_risk_amount typology rule, which uses z-score and amount thresholds to flag transactions that are unusually large for a given account."
     },
     {
       "tool": "anomaly_model",
       "params": {
         "method": "IsolationForest"
       },
-      "reason": "Because the query is broad ('unusually large for the account') with no specific typology or threshold, the anomaly model adds value by catching outliers that rule thresholds might miss across the full population."
+      "reason": "Run population-wide anomaly detection to catch accounts whose large-transaction behaviour is outlying even beyond what the named rule covers \u2014 important for a broad 'find anything unusual' query."
     },
     {
       "tool": "risk_scorer",
@@ -53,17 +56,21 @@
           "anomaly_model"
         ]
       },
-      "reason": "Combine rule hits and anomaly scores into a final LOW/MEDIUM/HIGH risk rating per flagged account, making results prioritisable for the analyst."
+      "reason": "Combine rule hits and anomaly scores into a weighted LOW/MEDIUM/HIGH risk rating for each flagged account so analysts can prioritise review."
     }
   ],
   "skipped": [
     {
       "tool": "profile_data",
-      "reason": "The query is entity/transaction-targeted, not a broad dataset overview \u2014 EDA summary statistics add no value here."
+      "reason": "The query is targeted at a specific behaviour (unusually large transactions), not a broad exploratory overview of the dataset."
+    },
+    {
+      "tool": "aggregate_data",
+      "reason": "The query is not a factual counting or threshold aggregation question; it requires per-account statistical context, which feature_engine and rules_engine handle."
     },
     {
       "tool": "graph_analysis",
-      "reason": "No network, ring, or counterparty pattern is implied. The query is purely about per-account transaction magnitude, not relationships between accounts."
+      "reason": "No network, ring, or counterparty pattern is implied \u2014 the query focuses solely on transaction amounts relative to individual account history."
     }
   ],
   "clarification_needed": null

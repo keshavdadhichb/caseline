@@ -1,9 +1,11 @@
 {
   "intent": "detect_structuring",
   "filters": {
-    "window_days": 7,
+    "window_days": null,
+    "date_from": "2022-09-10",
+    "date_to": "2022-09-17",
     "min_amount": null,
-    "accounts": []
+    "accounts": null
   },
   "typologies": [
     "structuring"
@@ -12,10 +14,10 @@
     {
       "tool": "filter_data",
       "params": {
-        "start_date": "2022-09-10",
-        "end_date": "2022-09-17"
+        "date_from": "2022-09-10",
+        "date_to": "2022-09-17"
       },
-      "reason": "Scope the dataset to the exact 7-day window requested before any detection logic runs."
+      "reason": "Scope the dataset to the explicit calendar window (Sep 10\u201317, 2022) before any detection work."
     },
     {
       "tool": "feature_engine",
@@ -27,7 +29,7 @@
           "pct_near_10k_threshold"
         ]
       },
-      "reason": "Compute per-account rolling features \u2014 particularly % of transactions near the $10,000 threshold and velocity \u2014 which are required inputs for the structuring rule in rules_engine."
+      "reason": "Compute per-account rolling features \u2014 especially % of transactions near the $10,000 threshold \u2014 which are required inputs for the rules_engine structuring rule."
     },
     {
       "tool": "rules_engine",
@@ -36,30 +38,36 @@
           "structuring"
         ]
       },
-      "reason": "Apply the named structuring rule to flag accounts with multiple sub-threshold transactions indicative of deliberate avoidance of the $10,000 reporting requirement."
+      "reason": "Apply the named structuring rule to flag accounts with multiple sub-threshold transactions designed to avoid the $10,000 reporting threshold."
     },
     {
       "tool": "risk_scorer",
       "params": {
-        "inputs": [
-          "rules_engine"
-        ]
+        "weights": {
+          "rule_hits": 0.7,
+          "anomaly_score": 0.0,
+          "graph_findings": 0.3
+        }
       },
-      "reason": "Translate rule hits into a weighted LOW/MEDIUM/HIGH risk rating for each flagged account, prioritising analyst review."
+      "reason": "Combine rule hits into a weighted LOW/MEDIUM/HIGH risk rating for each flagged account so the analyst can triage results."
     }
   ],
   "skipped": [
     {
+      "tool": "aggregate_data",
+      "reason": "This is a typology detection question (structuring), not a plain factual count/threshold aggregation \u2014 rules_engine is the correct tool."
+    },
+    {
       "tool": "profile_data",
-      "reason": "The query is narrowly targeted at a specific typology and date window \u2014 a broad EDA summary adds no value here."
+      "reason": "The query is narrowly scoped to a specific typology and date window, not a broad overview \u2014 EDA summary adds no value here."
     },
     {
       "tool": "anomaly_model",
-      "reason": "The typology (structuring) is well-defined and directly answerable by rules alone; the anomaly model is not needed for a scoped threshold question and would add noise without insight."
+      "reason": "Structuring is a well-defined, rules-addressable typology; the IsolationForest anomaly model adds nothing to this narrowly targeted query."
     },
     {
       "tool": "graph_analysis",
-      "reason": "Structuring detection is a single-account pattern; no network, ring, or counterparty analysis is implied by this query."
+      "reason": "Structuring is a single-account pattern (sub-threshold splitting); no network/ring or counterparty analysis is needed."
     }
   ],
   "clarification_needed": null

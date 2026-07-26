@@ -2,8 +2,10 @@
   "intent": "detect_ring",
   "filters": {
     "window_days": null,
+    "date_from": null,
+    "date_to": null,
     "min_amount": null,
-    "accounts": []
+    "accounts": null
   },
   "typologies": [
     "rapid_movement"
@@ -11,12 +13,8 @@
   "steps": [
     {
       "tool": "filter_data",
-      "params": {
-        "accounts": [],
-        "min_amount": null,
-        "window_days": null
-      },
-      "reason": "Scope the full dataset before passing to downstream tools. No specific account, amount, or time filter specified, so all data is included."
+      "params": {},
+      "reason": "Scope the full dataset before passing to downstream tools. No explicit date, amount, or account filters were given, so this loads all available transactions."
     },
     {
       "tool": "feature_engine",
@@ -28,7 +26,7 @@
           "velocity"
         ]
       },
-      "reason": "Compute per-account rapid in->out ratios and velocity features needed to identify accounts that quickly pass funds along \u2014 a hallmark of round-tripping rings."
+      "reason": "Compute per-account rolling features \u2014 especially rapid in->out ratio \u2014 needed to identify accounts that quickly pass funds along, a hallmark of round-tripping."
     },
     {
       "tool": "graph_analysis",
@@ -36,10 +34,9 @@
         "detection_modes": [
           "short_cycle",
           "fan_in_ring"
-        ],
-        "max_cycle_length": 6
+        ]
       },
-      "reason": "Core tool for this query: detects circular fund flows using networkx short-cycle and fan-in ring detection across the full transaction network."
+      "reason": "Core tool for this query: detects circular fund flows by finding short cycles and ring structures in the transaction network using networkx."
     },
     {
       "tool": "rules_engine",
@@ -48,28 +45,33 @@
           "rapid_movement"
         ]
       },
-      "reason": "Flags accounts exhibiting rapid in->out movement, which frequently co-occurs with circular round-tripping patterns and strengthens detection confidence."
+      "reason": "Apply the rapid_movement typology rule to flag accounts that rapidly move funds in and out, which commonly co-occurs with circular round-tripping patterns."
+    },
+    {
+      "tool": "anomaly_model",
+      "params": {},
+      "reason": "Run IsolationForest across the full population to surface anomalous accounts not caught by the graph or rules \u2014 round-tripping rings can involve subtle, low-volume flows that evade rule thresholds."
     },
     {
       "tool": "risk_scorer",
       "params": {
         "inputs": [
           "rules_engine",
-          "graph_analysis",
-          "feature_engine"
+          "anomaly_model",
+          "graph_analysis"
         ]
       },
-      "reason": "Aggregates graph ring findings, rapid_movement rule hits, and velocity features into a final LOW/MEDIUM/HIGH risk score per account/entity involved in detected cycles."
+      "reason": "Combine graph cycle findings, rapid_movement rule hits, and anomaly scores into a unified LOW/MEDIUM/HIGH risk ranking for flagged accounts and entities."
     }
   ],
   "skipped": [
     {
-      "tool": "profile_data",
-      "reason": "This is a targeted typology detection query (ring/cycle patterns), not a broad overview or EDA request \u2014 a population-level summary adds no value here."
+      "tool": "aggregate_data",
+      "reason": "This is a structural/topological pattern-detection query, not a factual counting or threshold question \u2014 aggregate_data adds no value here."
     },
     {
-      "tool": "anomaly_model",
-      "reason": "The query has a specific, well-defined typology (circular round-tripping). Graph analysis + rules_engine are the precise tools for this; the anomaly model's population-wide outlier scoring is redundant and would not improve cycle detection."
+      "tool": "profile_data",
+      "reason": "A broad EDA summary is not needed; the query is targeted at a specific typology (circular round-tripping), not an exploratory overview."
     }
   ],
   "clarification_needed": null

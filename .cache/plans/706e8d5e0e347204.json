@@ -1,0 +1,41 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No transaction data query \u2014 this is a conceptual/educational question, not a data analysis request."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "No dataset exploration needed for a conceptual question."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No per-account features needed for a conceptual question."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No rule evaluation needed for a conceptual question."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No anomaly detection needed for a conceptual question."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No graph/network analysis needed for a conceptual question."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No risk scoring needed for a conceptual question."
+    }
+  ],
+  "clarification_needed": null
+}

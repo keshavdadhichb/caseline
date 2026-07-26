@@ -1,11 +1,13 @@
 {
   "intent": "entity_lookup",
   "filters": {
-    "window_days": null,
-    "min_amount": null,
     "accounts": [
       "4521"
-    ]
+    ],
+    "window_days": null,
+    "date_from": null,
+    "date_to": null,
+    "min_amount": null
   },
   "typologies": [
     "structuring",
@@ -21,33 +23,20 @@
           "4521"
         ]
       },
-      "reason": "Scope all data to customer 4521 before any analysis."
+      "reason": "Scope all data to customer ID 4521 before any analysis."
     },
     {
       "tool": "feature_engine",
       "params": {
         "accounts": [
           "4521"
-        ],
-        "features": [
-          "7d_txn_count",
-          "30d_txn_count",
-          "7d_sum",
-          "30d_sum",
-          "amount_zscore",
-          "velocity",
-          "pct_near_10k",
-          "rapid_in_out_ratio"
         ]
       },
-      "reason": "Compute per-account rolling features needed by the rules engine, anomaly model, and risk scorer."
+      "reason": "Compute per-account rolling features (velocity, z-score, rapid in->out ratio, % near $10k threshold) required by rules_engine, anomaly_model, and risk_scorer."
     },
     {
       "tool": "rules_engine",
       "params": {
-        "accounts": [
-          "4521"
-        ],
         "typologies": [
           "structuring",
           "velocity",
@@ -55,7 +44,7 @@
           "high_risk_amount"
         ]
       },
-      "reason": "Check all named typology rules against customer 4521's features to identify any rule hits."
+      "reason": "Check all named typology rules against customer 4521's features to identify any rule-based flags."
     },
     {
       "tool": "anomaly_model",
@@ -64,20 +53,16 @@
           "4521"
         ]
       },
-      "reason": "Score customer 4521 against the full population baseline to catch anything rules alone might miss, given the broad 'is this customer suspicious?' question."
+      "reason": "Score customer 4521 against the full population baseline to catch anything the rules might miss, given the broad 'is this customer suspicious?' question."
     },
     {
       "tool": "graph_analysis",
       "params": {
         "accounts": [
           "4521"
-        ],
-        "checks": [
-          "fan_in_ring",
-          "short_cycle"
         ]
       },
-      "reason": "Investigate counterparty network for customer 4521 to detect ring or rapid-movement patterns that a single-entity rule check would not surface."
+      "reason": "Investigate customer 4521's counterparties for ring/fan-in patterns, since 'suspicious' may include network-level red flags."
     },
     {
       "tool": "risk_scorer",
@@ -92,7 +77,11 @@
   "skipped": [
     {
       "tool": "profile_data",
-      "reason": "This is a targeted single-entity query, not a broad overview \u2014 profile_data adds no value here."
+      "reason": "This is a single, named entity query \u2014 profile_data is only useful for broad/overview EDA across the full dataset."
+    },
+    {
+      "tool": "aggregate_data",
+      "reason": "No factual counting/threshold aggregation question was asked; the goal is holistic suspicion assessment, not a plain transaction count."
     }
   ],
   "clarification_needed": null

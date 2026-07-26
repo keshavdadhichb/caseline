@@ -2,6 +2,8 @@
   "intent": "detect_velocity",
   "filters": {
     "window_days": 7,
+    "date_from": null,
+    "date_to": null,
     "min_amount": null,
     "accounts": null
   },
@@ -14,18 +16,18 @@
       "params": {
         "window_days": 7
       },
-      "reason": "Scope the dataset to the most recent 7 days of transactions before running any analysis."
+      "reason": "Scope the dataset to the most recent 7 days of transactions relative to the dataset's latest timestamp."
     },
     {
       "tool": "feature_engine",
       "params": {
         "features": [
           "7d_txn_count",
-          "7d_txn_sum",
-          "velocity"
+          "velocity",
+          "amount_zscore"
         ]
       },
-      "reason": "Compute per-account rolling 7-day transaction count, sum, and velocity metrics \u2014 required inputs for the rules engine and risk scorer."
+      "reason": "Compute per-account rolling velocity features (7-day transaction count, velocity rate, z-scores) required by both the rules engine and anomaly model."
     },
     {
       "tool": "rules_engine",
@@ -34,30 +36,38 @@
           "velocity"
         ]
       },
-      "reason": "Apply the named velocity typology rule to flag accounts whose transaction frequency exceeds defined thresholds within the 7-day window."
+      "reason": "Apply the named velocity typology rule to flag accounts whose transaction frequency exceeds defined thresholds."
+    },
+    {
+      "tool": "anomaly_model",
+      "params": {
+        "method": "IsolationForest"
+      },
+      "reason": "Detect accounts with unusual velocity that may fall outside rule thresholds but are still statistical outliers vs. the full population baseline."
     },
     {
       "tool": "risk_scorer",
       "params": {
         "inputs": [
-          "rules_engine"
+          "rules_engine",
+          "anomaly_model"
         ]
       },
-      "reason": "Translate velocity rule hits into LOW/MEDIUM/HIGH risk levels for prioritized review."
+      "reason": "Combine rule hits and anomaly scores into a unified LOW/MEDIUM/HIGH risk ranking for each flagged account."
     }
   ],
   "skipped": [
     {
-      "tool": "profile_data",
-      "reason": "This is a targeted velocity detection query, not a broad overview \u2014 EDA summary adds no value here."
+      "tool": "aggregate_data",
+      "reason": "This is a typology/anomaly detection question, not a plain counting or threshold aggregation question \u2014 rules_engine and anomaly_model handle this more appropriately."
     },
     {
-      "tool": "anomaly_model",
-      "reason": "The query is narrowly scoped to velocity typology; the rules engine directly covers this without needing a population-wide anomaly model."
+      "tool": "profile_data",
+      "reason": "The query is narrowly scoped to velocity anomalies, not a broad exploratory overview of the dataset."
     },
     {
       "tool": "graph_analysis",
-      "reason": "No network, ring, or counterparty pattern is implied \u2014 this is a single-dimension velocity threshold question."
+      "reason": "No network, ring, or counterparty pattern is implied \u2014 this is a single-account velocity question."
     }
   ],
   "clarification_needed": null

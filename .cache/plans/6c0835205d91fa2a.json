@@ -1,0 +1,85 @@
+{
+  "intent": "detect_ring",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [
+    "rapid_movement",
+    "structuring",
+    "velocity"
+  ],
+  "steps": [
+    {
+      "tool": "filter_data",
+      "params": {
+        "window_days": null,
+        "min_amount": null,
+        "accounts": null
+      },
+      "reason": "Scope the dataset before any computation. No time/amount/account filters specified, so full dataset is used."
+    },
+    {
+      "tool": "feature_engine",
+      "params": {
+        "features": [
+          "7d_txn_count",
+          "30d_txn_count",
+          "7d_sum",
+          "30d_sum",
+          "rapid_in_out_ratio",
+          "velocity",
+          "amount_zscore"
+        ]
+      },
+      "reason": "Layering typically involves rapid movement of funds and high velocity. Per-account rolling features (especially rapid in->out ratio and velocity) are required inputs for the rules engine and anomaly model."
+    },
+    {
+      "tool": "rules_engine",
+      "params": {
+        "typologies": [
+          "rapid_movement",
+          "velocity",
+          "structuring"
+        ]
+      },
+      "reason": "Layering manifests as rapid_movement (funds quickly passed through accounts), velocity spikes, and potentially structuring to obscure amounts. Rules engine flags accounts matching these patterns."
+    },
+    {
+      "tool": "anomaly_model",
+      "params": {
+        "method": "IsolationForest"
+      },
+      "reason": "Layering is a broad 'find anything suspicious' concern \u2014 anomaly model catches accounts whose behavior deviates from the population baseline in ways rules alone might miss."
+    },
+    {
+      "tool": "graph_analysis",
+      "params": {
+        "methods": [
+          "fan_in_ring",
+          "short_cycle_detection"
+        ]
+      },
+      "reason": "Layering inherently involves a network of accounts passing funds through multiple hops. Graph analysis is essential to detect ring structures and short cycles characteristic of layering."
+    },
+    {
+      "tool": "risk_scorer",
+      "params": {
+        "inputs": [
+          "rules_engine",
+          "anomaly_model",
+          "graph_analysis"
+        ]
+      },
+      "reason": "Combines rule hits, anomaly scores, and graph findings into a final LOW/MEDIUM/HIGH risk ranking per account so analysts can prioritize reviews."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "profile_data",
+      "reason": "This is a targeted detection query, not a broad overview or EDA request. profile_data adds no detection value here."
+    }
+  ],
+  "clarification_needed": null
+}

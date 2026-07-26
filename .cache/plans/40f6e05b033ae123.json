@@ -1,0 +1,41 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": []
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No valid query provided \u2014 input is unrecognizable."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "No valid query provided \u2014 input is unrecognizable."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No valid query provided \u2014 input is unrecognizable."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No valid query provided \u2014 input is unrecognizable."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No valid query provided \u2014 input is unrecognizable."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No valid query provided \u2014 input is unrecognizable."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No valid query provided \u2014 input is unrecognizable."
+    }
+  ],
+  "clarification_needed": "Your input doesn't appear to be a valid query. Could you please describe what you'd like to investigate? For example: \"Which accounts made 10+ transactions under $10,000 in the last 30 days?\" or \"Find suspicious ring patterns involving account 4521.\""
+}

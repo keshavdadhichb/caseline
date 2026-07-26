@@ -1,0 +1,41 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No date, amount, or account scope implied \u2014 user is asking a general conceptual question, not a data query."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "No data exploration requested; user wants a plain-language explanation, not a dataset summary."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No transaction features need to be computed for a conceptual question."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No typology or threshold rule needs to be evaluated."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No anomaly detection is needed for a conceptual explanation."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network or ring pattern is being investigated."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No flags or findings to score."
+    }
+  ],
+  "clarification_needed": null
+}

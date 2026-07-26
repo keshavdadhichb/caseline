@@ -1,0 +1,49 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "date_from": null,
+    "date_to": null,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [],
+  "steps": [
+    {
+      "tool": "profile_data",
+      "params": {},
+      "reason": "The user is asking for a broad dataset-level summary \u2014 specifically the total number of accounts. profile_data is designed for this kind of overview EDA query and will return account count, transaction count, date range, and volume breakdown."
+    }
+  ],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No date, amount, account, or channel scoping is requested \u2014 the query is about the full dataset."
+    },
+    {
+      "tool": "aggregate_data",
+      "reason": "No threshold or count-band aggregation is needed; this is a simple dataset-wide summary."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No per-account rolling features are needed for a broad account count overview."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No typology detection is requested."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No anomaly detection is requested; this is a factual summary query."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network or counterparty analysis is requested."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No risk scoring is needed for a dataset overview query."
+    }
+  ],
+  "clarification_needed": null
+}

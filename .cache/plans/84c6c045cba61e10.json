@@ -2,6 +2,8 @@
   "intent": "detect_structuring",
   "filters": {
     "window_days": 30,
+    "date_from": null,
+    "date_to": null,
     "min_amount": null,
     "accounts": null
   },
@@ -14,7 +16,7 @@
       "params": {
         "window_days": 30
       },
-      "reason": "Scope the dataset to the last 30 days of transactions before any detection is run."
+      "reason": "Scope the dataset to the last 30 days relative to the latest transaction timestamp before running any detection."
     },
     {
       "tool": "feature_engine",
@@ -22,14 +24,13 @@
         "features": [
           "7d_txn_count",
           "30d_txn_count",
-          "7d_sum",
-          "30d_sum",
+          "30d_txn_sum",
           "amount_zscore",
           "pct_near_10k_threshold",
           "velocity"
         ]
       },
-      "reason": "Compute per-account rolling features \u2014 especially % of transactions near the $10,000 threshold and velocity \u2014 which are the primary inputs for structuring rule detection."
+      "reason": "Compute per-account rolling features \u2014 especially % of transactions near the $10,000 threshold and velocity \u2014 which are required inputs for the rules_engine structuring rule."
     },
     {
       "tool": "rules_engine",
@@ -38,7 +39,7 @@
           "structuring"
         ]
       },
-      "reason": "Apply the named structuring rule to flag accounts with repeated sub-threshold transactions indicative of deliberate structuring behavior."
+      "reason": "Apply the named structuring typology rule to flag accounts with suspicious patterns of sub-threshold transactions designed to avoid CTR reporting."
     },
     {
       "tool": "risk_scorer",
@@ -46,24 +47,28 @@
         "weights": {
           "rule_hits": 0.7,
           "anomaly_score": 0.0,
-          "graph_findings": 0.3
+          "graph_findings": 0.0
         }
       },
-      "reason": "Aggregate rule hits into a final LOW/MEDIUM/HIGH risk score for each flagged account to prioritize analyst review."
+      "reason": "Combine rule hits into a weighted LOW/MEDIUM/HIGH risk score for each flagged account so analysts can prioritize review."
     }
   ],
   "skipped": [
     {
       "tool": "profile_data",
-      "reason": "This is a targeted typology query, not a broad overview \u2014 profile_data's EDA summary adds no value here."
+      "reason": "The query is narrowly targeted at a specific typology (structuring), not a broad exploratory overview \u2014 a population-wide EDA summary adds no value here."
+    },
+    {
+      "tool": "aggregate_data",
+      "reason": "The question asks for a typology detection (structuring), not a plain factual count/threshold aggregation \u2014 rules_engine is the correct tool for this."
     },
     {
       "tool": "anomaly_model",
-      "reason": "The query is narrowly scoped to a specific typology (structuring). The rules_engine is sufficient; anomaly_model would add noise without additional insight."
+      "reason": "The query is scoped to a specific, well-defined typology. The rules_engine is sufficient; the anomaly model would add noise without additional signal for a narrowly-scoped structuring question."
     },
     {
       "tool": "graph_analysis",
-      "reason": "Structuring is a single-account behavior pattern. No network, ring, or counterparty analysis is requested or needed."
+      "reason": "Structuring is typically a single-account behaviour. No network, ring, or counterparty pattern is implied by this query."
     }
   ],
   "clarification_needed": null

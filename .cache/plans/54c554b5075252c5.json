@@ -1,0 +1,41 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No data scoping needed \u2014 this is a conceptual/meta question about methodology, not a data query."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "No dataset exploration needed \u2014 user is asking about scoring logic, not data characteristics."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No transaction features need to be computed \u2014 this is a methodology question."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No typology rules need to be evaluated \u2014 user is asking how scoring works, not flagging accounts."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No anomaly detection needed \u2014 this is a conceptual question."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network analysis needed \u2014 this is a conceptual question."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No accounts to score \u2014 user is asking about the scoring methodology itself, not requesting a score."
+    }
+  ],
+  "clarification_needed": null
+}

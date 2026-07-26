@@ -1,11 +1,13 @@
 {
-  "intent": "entity_lookup",
+  "intent": "overview",
   "filters": {
-    "window_days": null,
-    "min_amount": null,
     "accounts": [
       "RING-M01"
-    ]
+    ],
+    "window_days": null,
+    "date_from": null,
+    "date_to": null,
+    "min_amount": null
   },
   "typologies": [
     "structuring",
@@ -21,26 +23,16 @@
           "RING-M01"
         ]
       },
-      "reason": "Scope the dataset to only transactions involving account RING-M01 before any analysis."
+      "reason": "Scope all data to account RING-M01 before any analysis."
     },
     {
       "tool": "feature_engine",
       "params": {
         "accounts": [
           "RING-M01"
-        ],
-        "features": [
-          "7d_txn_count",
-          "30d_txn_count",
-          "7d_sum",
-          "30d_sum",
-          "amount_zscore",
-          "velocity",
-          "pct_near_10k",
-          "rapid_in_out_ratio"
         ]
       },
-      "reason": "Compute per-account rolling features for RING-M01 to feed into the rules engine and risk scorer."
+      "reason": "Compute per-account rolling features (velocity, z-score, rapid in->out ratio, % near $10k threshold) needed by downstream detection tools."
     },
     {
       "tool": "rules_engine",
@@ -55,20 +47,7 @@
           "high_risk_amount"
         ]
       },
-      "reason": "Run all named typology rules against RING-M01's features to surface any rule-based red flags."
-    },
-    {
-      "tool": "graph_analysis",
-      "params": {
-        "accounts": [
-          "RING-M01"
-        ],
-        "checks": [
-          "fan_in_ring",
-          "short_cycle"
-        ]
-      },
-      "reason": "The account name prefix 'RING' strongly suggests a network/ring pattern of interest; graph analysis will detect fan-in rings and short cycles involving RING-M01 and its counterparties."
+      "reason": "Check all named typology rules against RING-M01 to surface any rule-based flags."
     },
     {
       "tool": "anomaly_model",
@@ -77,7 +56,16 @@
           "RING-M01"
         ]
       },
-      "reason": "Score RING-M01 against the full population baseline to catch any anomalies that rule-based checks might miss on a single-entity investigation."
+      "reason": "Score RING-M01 against the full population baseline to catch anything the rules might miss in a broad 'anything concerning?' query."
+    },
+    {
+      "tool": "graph_analysis",
+      "params": {
+        "accounts": [
+          "RING-M01"
+        ]
+      },
+      "reason": "The account name 'RING-M01' strongly implies a potential ring/network pattern; investigate counterparties, fan-in, and short cycles."
     },
     {
       "tool": "risk_scorer",
@@ -92,7 +80,11 @@
   "skipped": [
     {
       "tool": "profile_data",
-      "reason": "This is a targeted single-entity query, not a broad overview. Profile data is only needed for wide population-level EDA."
+      "reason": "Query targets a single named account, not a broad/overview population \u2014 profile_data is only useful for wide EDA summaries."
+    },
+    {
+      "tool": "aggregate_data",
+      "reason": "No factual counting/threshold aggregation question was asked; detection tools cover the concern space adequately."
     }
   ],
   "clarification_needed": null

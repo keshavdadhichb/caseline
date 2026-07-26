@@ -2,6 +2,8 @@
   "intent": "overview",
   "filters": {
     "window_days": null,
+    "date_from": null,
+    "date_to": null,
     "min_amount": null,
     "accounts": null
   },
@@ -10,33 +12,37 @@
     {
       "tool": "profile_data",
       "params": {},
-      "reason": "The query is a broad overview request with no specific account, typology, or time scope \u2014 profile_data is designed exactly for this: summarizing txn count, accounts, date range, volume, and channel breakdown across the full dataset."
+      "reason": "The user wants a broad overview of the transaction data \u2014 profile_data is purpose-built for this: it returns txn count, accounts, date range, volume, and channel breakdown."
     }
   ],
   "skipped": [
     {
       "tool": "filter_data",
-      "reason": "No date, account, or amount scoping was requested \u2014 the analyst wants a full dataset overview, so no filtering is needed."
+      "reason": "No date, account, or amount scoping was requested \u2014 the overview covers the full dataset."
+    },
+    {
+      "tool": "aggregate_data",
+      "reason": "No specific threshold or count question was asked."
     },
     {
       "tool": "feature_engine",
-      "reason": "Per-account rolling features are not needed for a broad overview summary."
+      "reason": "No per-account rolling features are needed for a broad overview."
     },
     {
       "tool": "rules_engine",
-      "reason": "No specific typology or threshold rule is being investigated."
+      "reason": "No typology detection was requested."
     },
     {
       "tool": "anomaly_model",
-      "reason": "No anomaly detection requested; this is a general overview query."
+      "reason": "No anomaly detection was requested; this is a general overview query."
     },
     {
       "tool": "graph_analysis",
-      "reason": "No network, ring, or counterparty pattern analysis was requested."
+      "reason": "No network or ring pattern analysis was requested."
     },
     {
       "tool": "risk_scorer",
-      "reason": "No detection tools are running, so there are no flags to score."
+      "reason": "No risk scoring is needed for a plain data overview."
     }
   ],
   "clarification_needed": null

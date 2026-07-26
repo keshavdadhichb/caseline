@@ -1,0 +1,41 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No data filtering needed \u2014 this is a conceptual/meta question about how the risk score is computed, not a data query."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "No dataset exploration needed \u2014 this is not a data analysis query."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No feature computation needed \u2014 this is a conceptual question."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No rule evaluation needed \u2014 this is a conceptual question."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No anomaly detection needed \u2014 this is a conceptual question."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No graph analysis needed \u2014 this is a conceptual question."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No scoring needed \u2014 this is a conceptual question about how the scorer works, not a request to score any accounts."
+    }
+  ],
+  "clarification_needed": null
+}

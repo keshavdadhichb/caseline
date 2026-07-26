@@ -1,0 +1,47 @@
+{
+  "intent": "overview",
+  "filters": {
+    "window_days": null,
+    "date_from": null,
+    "date_to": null,
+    "min_amount": null,
+    "accounts": null
+  },
+  "typologies": [],
+  "steps": [],
+  "skipped": [
+    {
+      "tool": "filter_data",
+      "reason": "No scoping criteria provided \u2014 no date range, account, or amount filter specified."
+    },
+    {
+      "tool": "aggregate_data",
+      "reason": "No counting or threshold question was asked."
+    },
+    {
+      "tool": "profile_data",
+      "reason": "No data overview was requested."
+    },
+    {
+      "tool": "feature_engine",
+      "reason": "No detection or analysis was requested."
+    },
+    {
+      "tool": "rules_engine",
+      "reason": "No typology or rule-based detection was requested."
+    },
+    {
+      "tool": "anomaly_model",
+      "reason": "No anomaly detection was requested."
+    },
+    {
+      "tool": "graph_analysis",
+      "reason": "No network or relationship analysis was requested."
+    },
+    {
+      "tool": "risk_scorer",
+      "reason": "No flags to score \u2014 no detection tools were run."
+    }
+  ],
+  "clarification_needed": "What would you like to investigate? For example, you can ask about suspicious transaction patterns, specific accounts, structuring, velocity, high-risk amounts, or network/ring analysis."
+}
